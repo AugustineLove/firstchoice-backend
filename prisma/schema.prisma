@@ -1,6 +1,6 @@
 generator client {
   provider = "prisma-client"
-  output   = "../generated/prisma"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -138,19 +138,86 @@ model Vendor {
 }
 
 model Product {
-  id           String   @id @default(cuid())
-  vendorId     String
-  vendor       Vendor   @relation(fields: [vendorId], references: [id])
-  name         String
-  description  String?
-  price        Float
-  stock        Int      @default(0)
-  images       String[]
-  category     String
-  available    Boolean  @default(true)
-  createdAt    DateTime @default(now())
+  id          String   @id @default(cuid())
+  vendorId    String
+  vendor      Vendor   @relation(fields: [vendorId], references: [id])
 
-  orderItems   OrderItem[]
+  // Core
+  name        String
+  description String?
+  price       Float
+  stock       Int      @default(0)
+  images      String[]
+  category    String
+  available   Boolean  @default(true)
+
+  // Rich fields
+  preparationTime Int?      // minutes — food/pharmacy
+  calories        Int?      // food
+  weight          Float?    // grocery/pharmacy (grams)
+  volume          Float?    // drinks/pharmacy (ml)
+  unit            String?   // "kg", "ml", "pcs", "pack", etc.
+  brand           String?   // grocery/pharmacy/electronics
+  expiryInfo      String?   // pharmacy/grocery
+  sku             String?   // electronics/boutique
+  sizes           String[]  // boutique (XS/S/M/L/XL)
+  colors          String[]  // boutique
+  tags            String[]  // spicy, vegan, halal, gluten-free, etc.
+  isPopular       Boolean   @default(false)
+  isFeatured      Boolean   @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orderItems      OrderItem[]
+  variantGroups   ProductVariantGroup[]
+  addonGroups     ProductAddonGroup[]
+  attributes      ProductAttribute[]
+}
+
+model ProductVariantGroup {
+  id        String           @id @default(cuid())
+  productId String
+  product   Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name      String           // "Size", "Weight", "Volume"
+  required  Boolean          @default(true)
+  variants  ProductVariant[]
+}
+
+model ProductVariant {
+  id        String              @id @default(cuid())
+  groupId   String
+  group     ProductVariantGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  name      String              // "Small", "Medium", "Large", "500g"
+  priceAdjustment Float         @default(0) // +/- from base price
+  available Boolean             @default(true)
+}
+
+model ProductAddonGroup {
+  id         String         @id @default(cuid())
+  productId  String
+  product    Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name       String         // "Extras", "Toppings", "Drinks"
+  minSelect  Int            @default(0)
+  maxSelect  Int            @default(10)
+  addons     ProductAddon[]
+}
+
+model ProductAddon {
+  id        String            @id @default(cuid())
+  groupId   String
+  group     ProductAddonGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  name      String            // "Egg", "Plantain", "Sausage"
+  price     Float             @default(0)
+  available Boolean           @default(true)
+}
+
+model ProductAttribute {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  key       String  // "Brand", "Manufacturer", "Storage", "Ingredients"
+  value     String
 }
 
 model Order {
@@ -185,6 +252,10 @@ model OrderItem {
   product   Product @relation(fields: [productId], references: [id])
   quantity  Int
   unitPrice Float
+
+  selectedVariants Json?  // [{ groupName: "Size", variantName: "Large", priceAdjustment: 5 }]
+  selectedAddons   Json?  // [{ groupName: "Extras", addonName: "Egg", price: 2 }, ...]
+  itemNotes        String? // "No pepper please"
 }
 
 model DeliveryRequest {
@@ -193,13 +264,32 @@ model DeliveryRequest {
   customer            User           @relation(fields: [customerId], references: [id])
   assignedRiderId     String?
   rider               Rider?         @relation(fields: [assignedRiderId], references: [id])
+
   pickupAddress       String
+  pickupLatitude      Float?          // ← new
+  pickupLongitude     Float?          // ← new
+
   destinationAddress  String
+  destinationLatitude  Float?         // ← new
+  destinationLongitude Float?         // ← new
+
   itemDescription     String
   estimatedFee        Float
+  paymentMethod       PaymentMethod  @default(CASH)   // ← was missing
   status              DeliveryStatus @default(PENDING)
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
+}
+
+model Location {
+  id        String   @id @default(cuid())
+  name      String                          // e.g. "Agona Nkwanta Market"
+  address   String                          // full address string shown to user
+  latitude  Float
+  longitude Float
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Errand {

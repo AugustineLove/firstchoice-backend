@@ -100,3 +100,12 @@ export async function getMyActiveJobs(req: AuthRequest, res: Response) {
     res.status(400).json({ success: false, message: err.message });
   }
 }
+
+export async function getMyJobHistory(req: AuthRequest, res: Response) {
+  try {
+    const history = await RiderService.getRiderJobHistory(req.user!.id);
+    res.status(200).json({ success: true, data: history });
+  } catch (err: any) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+}

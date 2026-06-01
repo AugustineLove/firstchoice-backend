@@ -13,6 +13,12 @@ deliveryRouter.post('/', authorize('CUSTOMER'), DeliveryController.createDeliver
 deliveryRouter.get('/:id', DeliveryController.getDeliveryById);
 deliveryRouter.patch('/:id/status', DeliveryController.updateDeliveryStatus);
 
+// Rider: browse available + self-accept + update status + own jobs
+deliveryRouter.get('/pending',        authorize('RIDER'), DeliveryController.getPendingDeliveries);
+deliveryRouter.post('/:id/accept',    authorize('RIDER'), DeliveryController.acceptDelivery);
+deliveryRouter.get('/me/jobs',        authorize('RIDER'), DeliveryController.getMyRiderJobs);
+
+
 // Admin only
 deliveryRouter.get('/', authorize('ADMIN'), DeliveryController.getAllDeliveries);
 deliveryRouter.patch('/:id/assign', authorize('ADMIN'), DeliveryController.assignRider);

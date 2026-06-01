@@ -7,105 +7,89 @@ import {
   notifyVendor,
 } from '../socket/socket.manager';
 
+// In placeOrder, update the items validation and price calculation:
+
 export async function placeOrder(
   customerId: string,
   data: {
     vendorId: string;
-    items: { productId: string; quantity: number }[];
+    items: {
+      productId: string;
+      quantity: number;
+      selectedVariants?: { groupName: string; variantName: string; priceAdjustment: number }[];
+      selectedAddons?: { groupName: string; addonName: string; price: number }[];
+      itemNotes?: string;
+    }[];
     deliveryAddress: string;
     paymentMethod: 'CASH' | 'MOMO';
     notes?: string;
   }
 ) {
-  // 1. Verify vendor exists and is active
-  const vendor = await prisma.vendor.findUnique({
-    where: { id: data.vendorId },
-  });
+  const vendor = await prisma.vendor.findUnique({ where: { id: data.vendorId } });
   if (!vendor) throw new Error('Vendor not found');
-  if (vendor.status !== 'ACTIVE')
-    throw new Error('This vendor is currently unavailable');
+  if (vendor.status !== 'ACTIVE') throw new Error('This vendor is currently unavailable');
 
-  // 2. Fetch and validate all products
-  const productIds = data.items.map((i) => i.productId);
-  const products = await prisma.product.findMany({
+  const productIds = data.items.map(i => i.productId);
+  const products   = await prisma.product.findMany({
     where: { id: { in: productIds }, vendorId: data.vendorId },
   });
 
   if (products.length !== data.items.length)
-    throw new Error('One or more products not found or do not belong to this vendor');
+    throw new Error('One or more products not found');
 
   for (const item of data.items) {
-    const product = products.find((p) => p.id === item.productId);
-    if (!product) throw new Error(`Product not found: ${item.productId}`);
-    if (!product.available) throw new Error(`Product is unavailable: ${product.name}`);
-    if (product.stock < item.quantity)
-      throw new Error(`Insufficient stock for: ${product.name}`);
+    const product = products.find(p => p.id === item.productId)!;
+    if (!product.available) throw new Error(`Product unavailable: ${product.name}`);
+    if (product.stock < item.quantity) throw new Error(`Insufficient stock: ${product.name}`);
   }
 
-  // 3. Calculate totals
-  const orderItems = data.items.map((item) => {
-    const product = products.find((p) => p.id === item.productId)!;
+  // Calculate per-item price including variants and add-ons
+  const orderItems = data.items.map(item => {
+    const product = products.find(p => p.id === item.productId)!;
+    const variantExtra = (item.selectedVariants || []).reduce((s, v) => s + v.priceAdjustment, 0);
+    const addonExtra   = (item.selectedAddons   || []).reduce((s, a) => s + a.price, 0);
+    const unitPrice    = product.price + variantExtra + addonExtra;
+
     return {
-      productId: item.productId,
-      quantity: item.quantity,
-      unitPrice: product.price,
+      productId:        item.productId,
+      quantity:         item.quantity,
+      unitPrice,
+      selectedVariants: item.selectedVariants ? JSON.stringify(item.selectedVariants) : undefined,
+      selectedAddons:   item.selectedAddons   ? JSON.stringify(item.selectedAddons)   : undefined,
+      itemNotes:        item.itemNotes,
     };
   });
 
-  const subtotal = orderItems.reduce(
-    (sum, item) => sum + item.unitPrice * item.quantity,
-    0
-  );
+  const subtotal    = orderItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
   const deliveryFee = calculateDeliveryFee(subtotal);
   const totalAmount = subtotal + deliveryFee;
 
-  // 4. Create order + items + deduct stock in a transaction
   const order = await prisma.$transaction(async (tx) => {
     const newOrder = await tx.order.create({
       data: {
         customerId,
-        vendorId: data.vendorId,
+        vendorId:        data.vendorId,
         deliveryAddress: data.deliveryAddress,
-        paymentMethod: data.paymentMethod,
-        notes: data.notes || null,
+        paymentMethod:   data.paymentMethod,
+        notes:           data.notes || null,
         subtotal,
         deliveryFee,
         totalAmount,
         orderType: 'MARKETPLACE',
-        items: {
-          create: orderItems,
-        },
+        items: { create: orderItems },
       },
       include: {
-        items: {
-          include: { product: { select: { name: true, images: true } } },
-        },
+        items: { include: { product: { select: { name: true, images: true } } } },
         vendor: { select: { businessName: true, logo: true, phone: true } },
       },
     });
 
-    // Deduct stock
     for (const item of data.items) {
       await tx.product.update({
         where: { id: item.productId },
-        data: { stock: { decrement: item.quantity } },
+        data:  { stock: { decrement: item.quantity } },
       });
     }
-
-    // Notify vendor of new order
-  notifyVendor(data.vendorId, 'vendor:new_order', {
-    orderId: order.id,
-    customerName: order.items[0]?.product?.name,
-    totalAmount: order.totalAmount,
-    timestamp: new Date(),
-  });
-
-  notifyAdmins('admin:new_order', {
-    orderId: order.id,
-    vendorId: data.vendorId,
-    totalAmount: order.totalAmount,
-    timestamp: new Date(),
-  });
 
     return newOrder;
   });

@@ -109,6 +109,19 @@ function handleRiderEvents(socket: AuthenticatedSocket) {
     console.log(`Rider ${socket.userId} joined order room: ${orderId}`);
   });
 
+  // Rider explicitly fetches pending deliveries on connect
+  socket.on('rider:fetch_pending', async () => {
+    try {
+      const { prisma } = await import('../config/prisma');
+      const pending = await prisma.deliveryRequest.findMany({
+        where: { status: 'PENDING', assignedRiderId: null },
+        include: { customer: { select: { name: true, phone: true } } },
+        orderBy: { createdAt: 'desc' },
+      });
+      socket.emit('delivery:pending_list', pending);
+    } catch {}
+  });
+
   // Rider updates live location
   socket.on(
     'rider:location_update',

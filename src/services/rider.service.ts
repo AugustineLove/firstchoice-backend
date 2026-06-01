@@ -161,3 +161,30 @@ export async function getRiderActiveJobs(userId: string) {
 
   return { activeOrders, activeDeliveries };
 }
+
+export async function getRiderJobHistory(userId: string) {
+  const rider = await prisma.rider.findUnique({ where: { userId } });
+  if (!rider) throw new Error('Rider profile not found');
+
+  const [completedOrders, completedDeliveries] = await Promise.all([
+    prisma.order.findMany({
+      where: { riderId: rider.id, orderStatus: 'DELIVERED' },
+      include: {
+        customer: { select: { name: true, phone: true } },
+        vendor:   { select: { businessName: true, address: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    }),
+    prisma.deliveryRequest.findMany({
+      where: { assignedRiderId: rider.id, status: 'DELIVERED' },
+      include: {
+        customer: { select: { name: true, phone: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    }),
+  ]);
+
+  return { completedOrders, completedDeliveries };
+}
