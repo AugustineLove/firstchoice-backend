@@ -5,6 +5,7 @@ import { User } from '@prisma/client';
 import { AuthRequest } from '../interface/auth-request.interface.ts';
 
 export async function register(req: Request, res: Response) {
+  console.log(req.body)
   const error = validateRegister(req.body);
   if (error) {
     res.status(400).json({ success: false, message: error });

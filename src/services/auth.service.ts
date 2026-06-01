@@ -31,6 +31,7 @@ export async function registerUser(data: {
   const existing = await prisma.user.findUnique({
     where: { phone: data.phone },
   });
+  console.log(data);
 
   if (existing) throw new Error('Phone number already registered');
 
