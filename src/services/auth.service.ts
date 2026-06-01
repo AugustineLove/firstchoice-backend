@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../config/prisma';
-import { Role } from '../../generated/prisma/enums';
+import { Role } from '@prisma/client';
 import dotenv from 'dotenv';
 dotenv.config();
 

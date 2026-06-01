@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import * as AdminService from '../services/admin.service';
-import { UserStatus, VendorStatus } from '../../generated/prisma/enums';
+import { UserStatus, VendorStatus } from '@prisma/client';
 
 export async function getOverviewStats(req: Request, res: Response) {
   try {

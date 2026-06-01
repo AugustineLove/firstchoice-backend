@@ -1,4 +1,4 @@
-import { UserStatus, VendorStatus } from '../../generated/prisma/enums';
+import { UserStatus, VendorStatus } from '@prisma/client';
 import { prisma } from '../config/prisma';
 
 // ─── OVERVIEW STATS ─────────────────────────────────────

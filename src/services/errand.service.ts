@@ -1,4 +1,4 @@
-import { ErrandStatus } from '../../generated/prisma/enums';
+import { ErrandStatus } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import { notifyUser, notifyAdmins } from '../socket/socket.manager';
 

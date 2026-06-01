@@ -1,0 +1,10 @@
+import { Request, Response } from 'express';
+import { AuthRequest } from '../interface/auth-request.interface.ts';
+export declare function assignRider(req: Request, res: Response): Promise<void>;
+export declare function createDelivery(req: AuthRequest, res: Response): Promise<void>;
+export declare function acceptDelivery(req: AuthRequest, res: Response): Promise<void>;
+export declare function updateDeliveryStatus(req: AuthRequest, res: Response): Promise<void>;
+export declare function getDeliveryById(req: AuthRequest, res: Response): Promise<void>;
+export declare function getPendingDeliveries(req: Request, res: Response): Promise<void>;
+export declare function getMyRiderJobs(req: AuthRequest, res: Response): Promise<void>;
+export declare function getAllDeliveries(req: Request, res: Response): Promise<void>;

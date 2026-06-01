@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import * as TransactionService from '../services/transaction.service';
-import { PaymentMethod, PaymentStatus } from '../../generated/prisma/enums';
+import { PaymentMethod, PaymentStatus } from '@prisma/client';
 import { AuthRequest } from '../interface/auth-request.interface.ts';
 
 export async function recordTransaction(req: AuthRequest, res: Response) {

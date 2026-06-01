@@ -1,0 +1,12 @@
+import { Request, Response } from 'express';
+import { AuthRequest } from '../interface/auth-request.interface.ts';
+export declare function createProduct(req: AuthRequest, res: Response): Promise<void>;
+export declare function updateProduct(req: AuthRequest, res: Response): Promise<void>;
+export declare function deleteProduct(req: AuthRequest, res: Response): Promise<void>;
+export declare function getProductsByVendor(req: Request, res: Response): Promise<void>;
+export declare function getProductById(req: Request, res: Response): Promise<void>;
+export declare function searchProducts(req: Request, res: Response): Promise<void>;
+export declare function getMyProducts(req: AuthRequest, res: Response): Promise<void>;
+export declare function addAddonGroup(req: AuthRequest, res: Response): Promise<void>;
+export declare function deleteAddonGroup(req: AuthRequest, res: Response): Promise<void>;
+export declare function addVariantGroup(req: AuthRequest, res: Response): Promise<void>;

@@ -1,4 +1,4 @@
-import { DeliveryStatus, PaymentMethod } from '../../generated/prisma/enums';
+import { DeliveryStatus, PaymentMethod } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import { notifyUser, notifyAdmins } from '../socket/socket.manager';
 

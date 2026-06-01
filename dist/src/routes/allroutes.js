@@ -1,0 +1,29 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_routes_1 = __importDefault(require("./auth.routes"));
+const user_routes_1 = __importDefault(require("./user.routes"));
+const vendor_routes_1 = __importDefault(require("./vendor.routes"));
+const product_routes_1 = __importDefault(require("./product.routes"));
+const order_routes_1 = __importDefault(require("./order.routes"));
+const rider_routes_1 = __importDefault(require("./rider.routes"));
+const delivery_routes_1 = __importDefault(require("./delivery.routes"));
+const errand_routes_1 = __importDefault(require("./errand.routes"));
+const transaction_routes_1 = __importDefault(require("./transaction.routes"));
+const admin_routes_1 = __importDefault(require("./admin.routes"));
+const allRoutes = (0, express_1.Router)();
+allRoutes.use('/api/auth', auth_routes_1.default);
+allRoutes.use('/api/users', user_routes_1.default);
+allRoutes.use('/api/vendors', vendor_routes_1.default);
+allRoutes.use('/api/products', product_routes_1.default);
+allRoutes.use('/api/orders', order_routes_1.default);
+allRoutes.use('/api/riders', rider_routes_1.default);
+allRoutes.use('/api/deliveries', delivery_routes_1.default);
+allRoutes.use('/api/errands', errand_routes_1.default);
+allRoutes.use('/api/transactions', transaction_routes_1.default);
+allRoutes.use('/api/admin', admin_routes_1.default);
+exports.default = allRoutes;
+//# sourceMappingURL=allroutes.js.map

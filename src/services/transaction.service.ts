@@ -1,4 +1,4 @@
-import { PaymentMethod, PaymentStatus } from '../../generated/prisma/enums';
+import { PaymentMethod, PaymentStatus } from '@prisma/client';
 import { prisma } from '../config/prisma';
 
 export async function recordTransaction(

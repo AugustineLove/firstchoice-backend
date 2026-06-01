@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import * as AuthService from '../services/auth.service';
 import { validateRegister, validateLogin } from '../validators/auth.validator';
-import { User } from '../../generated/prisma/client';
+import { User } from '@prisma/client';
 import { AuthRequest } from '../interface/auth-request.interface.ts';
 
 export async function register(req: Request, res: Response) {

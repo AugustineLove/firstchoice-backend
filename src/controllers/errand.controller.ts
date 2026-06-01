@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import * as ErrandService from '../services/errand.service';
-import { ErrandStatus } from '../../generated/prisma/enums';
+import { ErrandStatus } from '@prisma/client';
 import { AuthRequest } from '../interface/auth-request.interface.ts';
 
 export async function createErrand(req: AuthRequest, res: Response) {

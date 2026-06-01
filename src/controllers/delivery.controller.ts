@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import * as DeliveryService from '../services/delivery.service';
-import { DeliveryStatus } from '../../generated/prisma/enums';
+import { DeliveryStatus } from '@prisma/client';
 import { AuthRequest } from '../interface/auth-request.interface.ts';
 
 export async function assignRider(req: Request, res: Response) {

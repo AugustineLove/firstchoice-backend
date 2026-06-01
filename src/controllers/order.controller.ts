@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import * as OrderService from '../services/order.service';
-import { OrderStatus } from '../../generated/prisma/enums';
+import { OrderStatus } from '@prisma/client';
 import { AuthRequest } from '../interface/auth-request.interface.ts';
 
 export async function placeOrder(req: AuthRequest, res: Response) {

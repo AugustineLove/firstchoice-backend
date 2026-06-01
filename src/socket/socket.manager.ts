@@ -2,7 +2,7 @@ import { Server as HttpServer } from 'http';
 import { Server as SocketServer, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../config/prisma';
-import { Role } from '../../generated/prisma/enums';
+import { Role } from '@prisma/client';
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
