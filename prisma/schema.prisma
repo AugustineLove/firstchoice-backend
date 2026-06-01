@@ -1,0 +1,226 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ───────────────────────────────────────────────
+
+enum Role {
+  CUSTOMER
+  RIDER
+  VENDOR
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING
+}
+
+enum RiderAvailability {
+  ONLINE
+  OFFLINE
+  BUSY
+}
+
+enum VendorStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+}
+
+enum OrderStatus {
+  PENDING
+  ACCEPTED
+  PREPARING
+  READY_FOR_PICKUP
+  RIDER_ASSIGNED
+  PICKED_UP
+  DELIVERED
+  CANCELLED
+}
+
+enum DeliveryStatus {
+  PENDING
+  ACCEPTED
+  PICKED_UP
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+enum ErrandStatus {
+  PENDING
+  ACCEPTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  MOMO
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+enum OrderType {
+  MARKETPLACE
+  DELIVERY
+  ERRAND
+}
+
+// ─── MODELS ──────────────────────────────────────────────
+
+model User {
+  id           String     @id @default(cuid())
+  name         String
+  phone        String     @unique
+  email        String?    @unique
+  passwordHash String
+  role         Role       @default(CUSTOMER)
+  profileImage String?
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  rider        Rider?
+  vendor       Vendor?
+  orders       Order[]
+  deliveries   DeliveryRequest[]
+  errands      Errand[]
+}
+
+model Rider {
+  id               String            @id @default(cuid())
+  userId           String            @unique
+  user             User              @relation(fields: [userId], references: [id])
+  bikeType         String
+  licenseNumber    String?
+  availability     RiderAvailability @default(OFFLINE)
+  currentLatitude  Float?
+  currentLongitude Float?
+  totalDeliveries  Int               @default(0)
+  rating           Float             @default(0)
+  earnings         Float             @default(0)
+  createdAt        DateTime          @default(now())
+
+  orders           Order[]
+  deliveries       DeliveryRequest[]
+}
+
+model Vendor {
+  id           String       @id @default(cuid())
+  userId       String       @unique
+  user         User         @relation(fields: [userId], references: [id])
+  businessName String
+  businessType String
+  address      String
+  phone        String
+  logo         String?
+  openingHours String?
+  status       VendorStatus @default(PENDING)
+  rating       Float        @default(0)
+  createdAt    DateTime     @default(now())
+
+  products     Product[]
+  orders       Order[]
+}
+
+model Product {
+  id           String   @id @default(cuid())
+  vendorId     String
+  vendor       Vendor   @relation(fields: [vendorId], references: [id])
+  name         String
+  description  String?
+  price        Float
+  stock        Int      @default(0)
+  images       String[]
+  category     String
+  available    Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  orderItems   OrderItem[]
+}
+
+model Order {
+  id              String        @id @default(cuid())
+  customerId      String
+  customer        User          @relation(fields: [customerId], references: [id])
+  vendorId        String
+  vendor          Vendor        @relation(fields: [vendorId], references: [id])
+  riderId         String?
+  rider           Rider?        @relation(fields: [riderId], references: [id])
+  subtotal        Float
+  deliveryFee     Float
+  totalAmount     Float
+  orderType       OrderType     @default(MARKETPLACE)
+  paymentMethod   PaymentMethod @default(CASH)
+  paymentStatus   PaymentStatus @default(PENDING)
+  orderStatus     OrderStatus   @default(PENDING)
+  deliveryAddress String
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  items           OrderItem[]
+  transaction     Transaction?
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  unitPrice Float
+}
+
+model DeliveryRequest {
+  id                  String         @id @default(cuid())
+  customerId          String
+  customer            User           @relation(fields: [customerId], references: [id])
+  assignedRiderId     String?
+  rider               Rider?         @relation(fields: [assignedRiderId], references: [id])
+  pickupAddress       String
+  destinationAddress  String
+  itemDescription     String
+  estimatedFee        Float
+  status              DeliveryStatus @default(PENDING)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+}
+
+model Errand {
+  id               String       @id @default(cuid())
+  customerId       String
+  customer         User         @relation(fields: [customerId], references: [id])
+  description      String
+  instructions     String?
+  budget           Float
+  pickupLocation   String?
+  status           ErrandStatus @default(PENDING)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+
+model Transaction {
+  id            String        @id @default(cuid())
+  orderId       String        @unique
+  order         Order         @relation(fields: [orderId], references: [id])
+  amount        Float
+  paymentMethod PaymentMethod
+  paymentStatus PaymentStatus @default(PENDING)
+  recordedAt    DateTime      @default(now())
+}
