@@ -40,6 +40,7 @@ exports.me = me;
 const AuthService = __importStar(require("../services/auth.service"));
 const auth_validator_1 = require("../validators/auth.validator");
 async function register(req, res) {
+    console.log(req.body);
     const error = (0, auth_validator_1.validateRegister)(req.body);
     if (error) {
         res.status(400).json({ success: false, message: error });

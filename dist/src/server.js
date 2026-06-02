@@ -9,13 +9,11 @@ const dotenv_1 = __importDefault(require("dotenv"));
 const socket_manager_1 = require("./socket/socket.manager");
 dotenv_1.default.config();
 const PORT = process.env.PORT || 5000;
-// Create HTTP server from Express app
 const httpServer = http_1.default.createServer(app_1.default);
-// Attach Socket.IO
 const io = (0, socket_manager_1.initSocket)(httpServer);
 app_1.default.set('io', io);
 httpServer.listen(PORT, () => {
-    console.log(`🚀 Robust server running on http://localhost:${PORT}`);
+    console.log(`🚀 Robust server running on port ${PORT}`);
     console.log(`⚡ Socket.IO ready`);
 });
 //# sourceMappingURL=server.js.map

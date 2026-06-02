@@ -26,6 +26,7 @@ async function registerUser(data) {
     const existing = await prisma_1.prisma.user.findUnique({
         where: { phone: data.phone },
     });
+    console.log(data);
     if (existing)
         throw new Error('Phone number already registered');
     const passwordHash = await bcryptjs_1.default.hash(data.password, 10);
