@@ -28,12 +28,14 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
 }
 
 export function authorize(...roles: Role[]) {
+  
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
       res.status(401).json({ success: false, message: 'Not authenticated' });
       return;
     }
     if (!roles.includes(req.user.role)) {
+      console.log(req.user.role, roles);
       res.status(403).json({ success: false, message: 'Access denied' });
       return;
     }

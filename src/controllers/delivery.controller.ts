@@ -20,6 +20,7 @@ export async function assignRider(req: Request, res: Response) {
   }
 }
 
+
 export async function createDelivery(req: AuthRequest, res: Response) {
   try {
     const { pickupAddress, destinationAddress, itemDescription, paymentMethod } = req.body;
@@ -113,6 +114,15 @@ export async function getAllDeliveries(req: Request, res: Response) {
       limit:  limit ? parseInt(limit as string) : 20,
     });
     res.status(200).json({ success: true, data: result });
+  } catch (err: any) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+}
+
+export async function getRiderJobs(req: AuthRequest, res: Response) {
+  try {
+    const jobs = await DeliveryService.getRiderJobs(req.user!.id);
+    res.status(200).json({ success: true, data: jobs });
   } catch (err: any) {
     res.status(400).json({ success: false, message: err.message });
   }

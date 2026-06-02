@@ -3,6 +3,7 @@ import { Server as SocketServer, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../config/prisma';
 import { Role } from '@prisma/client';
+import { logger } from '../middleware/logger.middleware';
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;

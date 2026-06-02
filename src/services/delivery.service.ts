@@ -6,6 +6,7 @@ import {
   notifyRiders,
   getIO,
 } from '../socket/socket.manager';
+import { logger } from '../middleware/logger.middleware';
 
 function calculateDeliveryEstimate(
   pickupLat?: number,

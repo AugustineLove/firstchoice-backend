@@ -17,6 +17,7 @@ deliveryRouter.patch('/:id/status', DeliveryController.updateDeliveryStatus);
 deliveryRouter.get('/pending',        authorize('RIDER'), DeliveryController.getPendingDeliveries);
 deliveryRouter.post('/:id/accept',    authorize('RIDER'), DeliveryController.acceptDelivery);
 deliveryRouter.get('/me/jobs',        authorize('RIDER'), DeliveryController.getMyRiderJobs);
+deliveryRouter.get('/riders/jobs',             authenticate, DeliveryController.getRiderJobs);
 
 
 // Admin only
