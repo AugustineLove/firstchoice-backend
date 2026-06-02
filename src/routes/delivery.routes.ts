@@ -8,13 +8,14 @@ deliveryRouter.use(authenticate);
 
 // Customer
 deliveryRouter.post('/', authorize('CUSTOMER'), DeliveryController.createDelivery);
+deliveryRouter.get('/pending',        authorize('RIDER'), DeliveryController.getPendingDeliveries);
 
 // Customer, Rider, Admin
 deliveryRouter.get('/:id', DeliveryController.getDeliveryById);
 deliveryRouter.patch('/:id/status', DeliveryController.updateDeliveryStatus);
 
 // Rider: browse available + self-accept + update status + own jobs
-deliveryRouter.get('/pending',        authorize('RIDER'), DeliveryController.getPendingDeliveries);
+
 deliveryRouter.post('/:id/accept',    authorize('RIDER'), DeliveryController.acceptDelivery);
 deliveryRouter.get('/me/jobs',        authorize('RIDER'), DeliveryController.getMyRiderJobs);
 deliveryRouter.get('/riders/jobs',             authenticate, DeliveryController.getRiderJobs);

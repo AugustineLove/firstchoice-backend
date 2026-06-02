@@ -440,7 +440,7 @@ export async function updateDeliveryStatus(
 // ─── FETCH PENDING (for riders to browse) ────────────────
 
 export async function getPendingDeliveries() {
-  return prisma.deliveryRequest.findMany({
+  const deliveries = await prisma.deliveryRequest.findMany({
     where: {
       status:          'PENDING',
       assignedRiderId: null,
@@ -450,6 +450,8 @@ export async function getPendingDeliveries() {
     },
     orderBy: { createdAt: 'desc' },
   });
+
+  return deliveries;
 }
 
 // ─── RIDER'S OWN JOBS ────────────────────────────────────
