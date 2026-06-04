@@ -138,6 +138,7 @@ export async function updateProduct(
 
   const { variantGroups, addonGroups, attributes, ...core } = data;
 
+  // Increase transaction timeout to 15 seconds
   return prisma.$transaction(async (tx) => {
     // Update core fields
     const updated = await tx.product.update({
@@ -152,16 +153,19 @@ export async function updateProduct(
         await tx.productVariantGroup.createMany({
           data: variantGroups.map(g => ({ productId, name: g.name, required: g.required ?? true })),
         });
-        // Re-fetch groups to get their IDs then create variants
+        
+        // Get created groups and create variants in parallel
         const groups = await tx.productVariantGroup.findMany({ where: { productId } });
-        for (const g of variantGroups) {
-          const group = groups.find(gr => gr.name === g.name);
-          if (group) {
-            await tx.productVariant.createMany({
-              data: g.variants.map(v => ({ ...v, groupId: group.id })),
-            });
-          }
-        }
+        await Promise.all(
+          variantGroups.map(async (g) => {
+            const group = groups.find(gr => gr.name === g.name);
+            if (group && g.variants.length) {
+              await tx.productVariant.createMany({
+                data: g.variants.map(v => ({ ...v, groupId: group.id })),
+              });
+            }
+          })
+        );
       }
     }
 
@@ -170,17 +174,26 @@ export async function updateProduct(
       await tx.productAddonGroup.deleteMany({ where: { productId } });
       if (addonGroups.length) {
         await tx.productAddonGroup.createMany({
-          data: addonGroups.map(g => ({ productId, name: g.name, minSelect: g.minSelect ?? 0, maxSelect: g.maxSelect ?? 10 })),
+          data: addonGroups.map(g => ({ 
+            productId, 
+            name: g.name, 
+            minSelect: g.minSelect ?? 0, 
+            maxSelect: g.maxSelect ?? 10 
+          })),
         });
+        
+        // Get created groups and create addons in parallel
         const groups = await tx.productAddonGroup.findMany({ where: { productId } });
-        for (const g of addonGroups) {
-          const group = groups.find(gr => gr.name === g.name);
-          if (group) {
-            await tx.productAddon.createMany({
-              data: g.addons.map(a => ({ ...a, groupId: group.id })),
-            });
-          }
-        }
+        await Promise.all(
+          addonGroups.map(async (g) => {
+            const group = groups.find(gr => gr.name === g.name);
+            if (group && g.addons.length) {
+              await tx.productAddon.createMany({
+                data: g.addons.map(a => ({ ...a, groupId: group.id })),
+              });
+            }
+          })
+        );
       }
     }
 
@@ -194,7 +207,13 @@ export async function updateProduct(
       }
     }
 
-    return tx.product.findUnique({ where: { id: productId }, include: fullProductInclude });
+    return tx.product.findUnique({ 
+      where: { id: productId }, 
+      include: fullProductInclude 
+    });
+  }, {
+    timeout: 15000, // Increase timeout to 15 seconds
+    maxWait: 20000, // Maximum time to wait for transaction to acquire lock
   });
 }
 

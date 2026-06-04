@@ -3,6 +3,7 @@ import * as AuthService from '../services/auth.service';
 import { validateRegister, validateLogin } from '../validators/auth.validator';
 import { User } from '@prisma/client';
 import { AuthRequest } from '../interface/auth-request.interface.ts';
+import { prisma } from '../config/prisma';
 
 export async function register(req: Request, res: Response) {
   console.log(req.body)
@@ -52,5 +53,28 @@ export async function refresh(req: Request, res: Response) {
 }
 
 export async function me(req: AuthRequest, res: Response) {
-  res.status(200).json({ success: true, data: { user: req.user } });
+  try {
+    const rawUser = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: { id:true, name:true, phone:true, email:true, role:true, status:true, profileImage:true },
+    });
+    if (!rawUser) { res.status(404).json({ success:false, message:'User not found' }); return; }
+
+    const vendor = await prisma.vendor.findUnique({
+      where: { userId: rawUser.id },
+      select: { id: true },
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        user: {
+          ...rawUser,
+          hasVendorProfile: vendor !== null,  // ← actual DB check
+        },
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 }

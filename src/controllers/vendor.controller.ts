@@ -3,6 +3,7 @@ import * as VendorService from '../services/vendor.service';
 import { AuthRequest } from '../interface/auth-request.interface.ts';
 
 export async function registerVendor(req: AuthRequest, res: Response) {
+  console.log(req.user);
   try {
     const { businessName, businessType, address, phone, logo, openingHours } =
       req.body;
@@ -75,6 +76,7 @@ export async function getVendorOrders(req: AuthRequest, res: Response) {
 }
 
 export async function getVendorStats(req: AuthRequest, res: Response) {
+  console.log(`Body: ${req.body}`)
   try {
     const stats = await VendorService.getVendorStats(req.user!.id);
     res.status(200).json({ success: true, data: stats });

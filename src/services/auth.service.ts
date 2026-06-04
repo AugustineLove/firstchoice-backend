@@ -8,6 +8,24 @@ dotenv.config();
 const JWT_SECRET = process.env.JWT_SECRET!;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET!;
 
+async function buildUserResponse(user: any) {
+  const vendorProfile = await prisma.vendor.findUnique({
+    where: { userId: user.id },
+    select: { id: true },
+  });
+
+  return {
+    id:               user.id,
+    name:             user.name,
+    phone:            user.phone,
+    email:            user.email,
+    role:             user.role,
+    status:           user.status,
+    profileImage:     user.profileImage,
+    hasVendorProfile: vendorProfile !== null,  // ← actual DB check
+  };
+}
+
 
 function generateTokens(userId: string, role: Role) {
   const accessToken = jwt.sign({ id: userId, role }, JWT_SECRET, {
@@ -37,7 +55,7 @@ export async function registerUser(data: {
 
   const passwordHash = await bcrypt.hash(data.password, 10);
 
-  const user = await prisma.user.create({
+  const rawUser = await prisma.user.create({
     data: {
       name: data.name.trim(),
       phone: data.phone.trim(),
@@ -56,7 +74,8 @@ export async function registerUser(data: {
     },
   });
 
-  const tokens = generateTokens(user.id, user.role);
+  const tokens = generateTokens(rawUser.id, rawUser.role);
+  const user   = await buildUserResponse(rawUser);
 
   return { user, ...tokens };
 }
@@ -66,31 +85,21 @@ export async function loginUser(data: {
   password: string;
 }) {
   console.log(data);
-  const user = await prisma.user.findUnique({
+  const rawUser = await prisma.user.findUnique({
     where: { phone: data.phone },
   });
 
-  if (!user) throw new Error('Invalid phone number or password');
+  if (!rawUser) throw new Error('Invalid phone number or password');
 
-  if (user.status === 'SUSPENDED')
+  if (rawUser.status === 'SUSPENDED')
     throw new Error('Your account has been suspended');
 
-  const isMatch = await bcrypt.compare(data.password, user.passwordHash);
+  const isMatch = await bcrypt.compare(data.password, rawUser.passwordHash);
   if (!isMatch) throw new Error('Invalid phone number or password');
 
-  const tokens = generateTokens(user.id, user.role);
-
-  return {
-    user: {
-      id: user.id,
-      name: user.name,
-      phone: user.phone,
-      email: user.email,
-      role: user.role,
-      status: user.status,
-    },
-    ...tokens,
-  };
+  const tokens = generateTokens(rawUser.id, rawUser.role);
+  const user   = await buildUserResponse(rawUser);
+  return { user, ...tokens };
 }
 
 export async function refreshAccessToken(token: string) {
