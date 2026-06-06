@@ -6,3 +6,5 @@ firebase-service-account.json
 
 
 /generated/prisma
+firebase-service-account.json
+.env
