@@ -26,6 +26,19 @@ interface PushPayload {
   imageUrl?: string;
 }
 
+function cleanString(str: any): string {
+  if (typeof str !== 'string') return String(str || '');
+
+  return str
+    // 1. Normalize unicode characters into standard forms
+    .normalize("NFC")
+    // 2. Replace stylistic em-dashes or en-dashes with a standard plain hyphen
+    .replace(/[\u2014\u2013]/g, "-")
+    // 3. Strip out invisible control characters (ASCII 0-31 and 127)
+    .replace(/[\x00-\x1F\x7F]/g, "")
+    .trim();
+}
+
 async function sendToUser(userId: string, payload: PushPayload): Promise<boolean> {
   try {
     const user = await prisma.user.findUnique({
@@ -33,26 +46,40 @@ async function sendToUser(userId: string, payload: PushPayload): Promise<boolean
       select: { fcmToken: true, name: true },
     });
 
-    console.log(`SendToUser notification user: ${user}`); 
+    console.log(`SendToUser notification user: ${JSON.stringify(user)}`); 
+
+    const cleanToken = cleanString(user?.fcmToken);
+    if (!cleanToken) return false;
 
     if (!user?.fcmToken) return false;
 
+    // 1. Clean the payload parts carefully up front
+    const safeTitle = cleanString(payload.title);
+    const safeBody = cleanString(payload.body);
+    
+    const safeData: Record<string, string> = {};
+    if (payload.data) {
+      for (const [key, value] of Object.entries(payload.data)) {
+        safeData[key] = cleanString(value);
+      }
+    }
+
+    // 2. Safe log logging
+    console.log("CLEANED PAYLOAD:", JSON.stringify({ title: safeTitle, body: safeBody, data: safeData }, null, 2));
+
     await getApp().messaging().send({
-      token: user.fcmToken,
+      token: cleanToken,
       notification: {
-        title: payload.title,
-        body:  payload.body,
+        title: safeTitle,
+        body: safeBody,
         ...(payload.imageUrl && { imageUrl: payload.imageUrl }),
       },
-      data: {
-        ...(payload.data || {}),
-        click_action: 'FLUTTER_NOTIFICATION_CLICK',
-      },
+      data: safeData,
       android: {
-        priority: 'high',
+        priority: "high",
         notification: {
-          channelId: 'firstchoice_channel',
-          priority:  'high',
+          channelId: "firstchoice_channel",
+          priority: "high",
           defaultSound: true,
           defaultVibrateTimings: true,
         },
@@ -60,7 +87,7 @@ async function sendToUser(userId: string, payload: PushPayload): Promise<boolean
       apns: {
         payload: {
           aps: {
-            sound: 'default',
+            sound: "default",
             badge: 1,
             contentAvailable: true,
           },
@@ -70,14 +97,13 @@ async function sendToUser(userId: string, payload: PushPayload): Promise<boolean
 
     return true;
   } catch (err: any) {
-    // Token expired/invalid — clean it up
     if (err.code === 'messaging/registration-token-not-registered') {
       await prisma.user.update({
         where: { id: userId },
         data: { fcmToken: null },
       }).catch(() => {});
     }
-    console.error(`Push failed for user ${userId}:`, err.message);
+    console.error(`Push failed for user ${userId}:`, err?.message || err);
     return false;
   }
 }
@@ -115,8 +141,8 @@ export async function notifyNewOrder(orderId: string): Promise<void> {
 
   // → Vendor
   await sendToUser(order.vendor.user.id, {
-    title: '🛒 New Order!',
-    body:  `${order.customer.name} ordered ${itemSummary} — GHS ${order.totalAmount.toFixed(2)}`,
+    title: 'New Order',
+    body:  `${order.customer.name} ordered ${itemSummary} GHS ${order.totalAmount.toFixed(2)}`,
     data:  { type: 'NEW_ORDER', orderId, screen: 'orders' },
   });
 
