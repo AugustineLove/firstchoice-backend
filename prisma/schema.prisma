@@ -98,6 +98,10 @@ model User {
   orders       Order[]
   deliveries   DeliveryRequest[]
   errands      Errand[]
+
+  fcmToken   String?
+  fcmUpdatedAt DateTime? @updatedAt
+
 }
 
 model Rider {

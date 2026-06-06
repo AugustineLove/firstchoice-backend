@@ -1,5 +1,5 @@
 import { prisma } from '../config/prisma';
-
+import * as NotificationService from './notification.service';
 export async function registerVendor(
   userId: string,
   data: {
@@ -34,7 +34,7 @@ export async function registerVendor(
       where: { id: userId },
       data: { role: 'VENDOR' },
     });
-
+    await NotificationService.notifyVendorPendingApproval(data.businessName);
     return newVendor;
   });
 

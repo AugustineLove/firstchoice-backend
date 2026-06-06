@@ -6,6 +6,7 @@ import {
   notifyAdmins,
   notifyVendor,
 } from '../socket/socket.manager';
+import * as NotificationService from './notification.service';
 
 // In placeOrder, update the items validation and price calculation:
 
@@ -91,8 +92,14 @@ export async function placeOrder(
       });
     }
 
+    await NotificationService.notifyNewOrder(newOrder.id);
     return newOrder;
+  }, {
+    timeout: 15000,
+    maxWait: 30000,
   });
+
+  await NotificationService.notifyNewOrder(order.id);
 
   return order;
 }
@@ -206,7 +213,8 @@ export async function updateOrderStatus(
     );
 
   await emitOrderEvent(orderId, newStatus);
-
+  await NotificationService.notifyOrderStatusChange(orderId, newStatus);
+  
   return prisma.order.update({
     where: { id: orderId },
     data: { orderStatus: newStatus },
@@ -339,3 +347,4 @@ async function emitOrderEvent(orderId: string, status: OrderStatus) {
     });
   }
 }
+

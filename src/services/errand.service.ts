@@ -1,6 +1,7 @@
 import { ErrandStatus } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import { notifyUser, notifyAdmins } from '../socket/socket.manager';
+import * as NotificationService from './notification.service';
 
 export async function createErrand(
   customerId: string,
@@ -13,7 +14,8 @@ export async function createErrand(
 ) {
   if (data.budget <= 0) throw new Error('Budget must be greater than 0');
 
-  return prisma.errand.create({
+  
+  const errand = prisma.errand.create({
     data: {
       customerId,
       description: data.description.trim(),
@@ -22,6 +24,8 @@ export async function createErrand(
       pickupLocation: data.pickupLocation?.trim() || null,
     },
   });
+  await NotificationService.notifyNewErrand((await errand).id);
+  return errand;
 }
 
 export async function getErrandById(errandId: string, userId: string) {
@@ -90,13 +94,16 @@ export async function updateErrandStatus(
     timestamp: new Date(),
   });
   
-  return prisma.errand.update({
+  const updatedErrand = prisma.errand.update({
     where: { id: errandId },
     data: { status: newStatus },
     include: {
       customer: { select: { name: true, phone: true } },
     },
   });
+
+  await NotificationService.notifyErrandStatusChange(errandId, newStatus, errand.customerId);
+  return updatedErrand;
 }
 
 export async function getAllErrands(filters: {

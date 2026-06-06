@@ -1,3 +1,4 @@
+import * as NotificationService from './notification.service';
 import { UserStatus, VendorStatus } from '@prisma/client';
 import { prisma } from '../config/prisma';
 
@@ -167,10 +168,14 @@ export async function updateVendorStatus(
   const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
   if (!vendor) throw new Error('Vendor not found');
 
-  return prisma.vendor.update({
+  const updatedVendor =  prisma.vendor.update({
     where: { id: vendorId },
     data: { status },
   });
+    if (status === 'ACTIVE') {
+    await NotificationService.notifyVendorApproved(vendor.userId, vendor.businessName);
+  }
+return updatedVendor;
 }
 
 // ─── RIDER MANAGEMENT ───────────────────────────────────

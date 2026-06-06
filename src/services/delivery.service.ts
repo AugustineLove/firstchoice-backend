@@ -1,7 +1,7 @@
 import { DeliveryStatus, PaymentMethod } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import { notifyUser, notifyAdmins } from '../socket/socket.manager';
-
+import * as NotificationService from './notification.service';
 import {
   notifyRiders,
   getIO,
@@ -262,6 +262,7 @@ export async function createDeliveryRequest(
 
   // Also notify admins
   notifyAdmins('admin:new_delivery', payload);
+  await NotificationService.notifyNewDelivery(delivery.id);
 
   return delivery;
 }
@@ -416,7 +417,8 @@ export async function updateDeliveryStatus(
         data:  { availability: 'ONLINE' },
       });
     }
-
+    await NotificationService.notifyDeliveryStatusChange(deliveryId, newStatus);
+  
     return result;
   });
 
