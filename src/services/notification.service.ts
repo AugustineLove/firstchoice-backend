@@ -9,7 +9,7 @@ function getApp(): admin.app.App {
   if (!initialized) {
     admin.initializeApp({
       credential: admin.credential.cert(
-        path.join(process.cwd(), 'firebase-service-account.json')
+        JSON.parse(process.env.FIREBASE_KEY!)
       ),
     });
     initialized = true;
