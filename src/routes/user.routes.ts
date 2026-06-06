@@ -16,6 +16,8 @@ userRouter.get('/me/orders', UserController.getMyOrders);
 userRouter.get('/me/deliveries', UserController.getMyDeliveries);
 userRouter.get('/me/errands', UserController.getMyErrands);
 
+
+// Add user token
 userRouter.post('/me/fcm-token', authenticate, async (req: AuthRequest, res) => {
   try {
     const { token } = req.body;
