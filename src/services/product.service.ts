@@ -13,7 +13,7 @@ interface AddonGroupInput {
   minSelect?: number;
   maxSelect?: number;
   addons: { name: string; price?: number; available?: boolean }[];
-  incrementable?: string;
+  incrementable?: boolean;
   incrementMode?: string;
 }
 

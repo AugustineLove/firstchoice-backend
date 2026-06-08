@@ -213,7 +213,7 @@ model ProductAddon {
   name      String            // "Egg", "Plantain", "Sausage"
   price     Float             @default(0)
   available Boolean           @default(true)
-  incrementable String?
+  incrementable Boolean       @default(false)
   incrementMode String?
 }
 
