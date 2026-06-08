@@ -213,6 +213,8 @@ model ProductAddon {
   name      String            // "Egg", "Plantain", "Sausage"
   price     Float             @default(0)
   available Boolean           @default(true)
+  incrementable String?
+  incrementMode String?
 }
 
 model ProductAttribute {
@@ -238,6 +240,8 @@ model Order {
   paymentMethod   PaymentMethod @default(CASH)
   paymentStatus   PaymentStatus @default(PENDING)
   orderStatus     OrderStatus   @default(PENDING)
+  recipientName   String?
+  recipientPhone  String?
   deliveryAddress String
   notes           String?
   createdAt       DateTime      @default(now())
