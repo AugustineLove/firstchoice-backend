@@ -32,7 +32,7 @@ function calculateDeliveryEstimate(
     if (km <= 15) return 18;
     return 25;
   }
-  return 10; // fallback flat rate
+  return 10;
 }
  
 export async function getDeliveryById(deliveryId: string, userId: string) {
@@ -221,7 +221,9 @@ export async function createDeliveryRequest(
     paymentMethod: 'CASH' | 'MOMO';
   }
 ) {
-  const estimatedFee = 10; // flat rate MVP
+  const estimatedFee = calculateDeliveryEstimate(
+    data.pickupLatitude, data.pickupLongitude, data.destinationLatitude, data.destinationLongitude
+  )
 
   const delivery = await prisma.deliveryRequest.create({
     data: {

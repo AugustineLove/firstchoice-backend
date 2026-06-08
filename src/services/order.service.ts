@@ -5,6 +5,7 @@ import {
   notifyOrderRoom,
   notifyAdmins,
   notifyVendor,
+  notifyRiders,
 } from '../socket/socket.manager';
 import * as NotificationService from './notification.service';
 
@@ -208,6 +209,22 @@ export async function updateOrderStatus(
     const cancellable = ['PENDING', 'ACCEPTED'];
     if (!cancellable.includes(order.orderStatus))
       throw new Error('Order can no longer be cancelled');
+  }
+  if (newStatus ==='READY_FOR_PICKUP'){
+    notifyRiders('delivery:new_request', {
+      type: 'NEW_DELIVERY',
+      orderId: order.id,
+      pickupAddress: vendor?.address,
+      destinationAddress: order.deliveryAddress,
+      itemDescription: order.notes,
+      estimatedFee: order.deliveryFee,
+      paymentMethod: order.paymentMethod,
+      customer: {
+        name: order.recipientName,
+        phone: order.recipientPhone,
+      },
+      createdAt: order.createdAt
+    })
   }
 
   // Validate transition
