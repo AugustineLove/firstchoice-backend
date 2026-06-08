@@ -140,9 +140,10 @@ export async function notifyNewOrder(orderId: string): Promise<void> {
     + (order.items.length > 2 ? ` +${order.items.length - 2} more` : '');
 
   // → Vendor
+  console.log(JSON.stringify(order))
   await sendToUser(order.vendor.user.id, {
     title: 'New Order',
-    body:  `${order.customer.name} ordered ${itemSummary} GHS ${order.totalAmount.toFixed(2)}`,
+    body:  `${order.customer.name} ordered ${itemSummary} GHS ${order.subtotal.toFixed(2)}`,
     data:  { type: 'NEW_ORDER', orderId, screen: 'orders' },
   });
 

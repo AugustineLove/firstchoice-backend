@@ -168,6 +168,7 @@ export async function updateVendorStatus(
   const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
   if (!vendor) throw new Error('Vendor not found');
 
+  console.log(vendorId);
   const updatedVendor =  prisma.vendor.update({
     where: { id: vendorId },
     data: { status },

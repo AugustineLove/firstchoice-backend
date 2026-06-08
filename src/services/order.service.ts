@@ -21,6 +21,8 @@ export async function placeOrder(
       selectedAddons?: { groupName: string; addonName: string; price: number }[];
       itemNotes?: string;
     }[];
+    recipientName?: string;
+    recipientPhone?: string;
     deliveryAddress: string;
     paymentMethod: 'CASH' | 'MOMO';
     notes?: string;
@@ -72,6 +74,8 @@ export async function placeOrder(
         vendorId:        data.vendorId,
         deliveryAddress: data.deliveryAddress,
         paymentMethod:   data.paymentMethod,
+        recipientName: data.recipientName || null,
+        recipientPhone: data.recipientPhone || null,
         notes:           data.notes || null,
         subtotal,
         deliveryFee,
@@ -92,6 +96,7 @@ export async function placeOrder(
       });
     }
 
+    console.log(newOrder.id)
     await NotificationService.notifyNewOrder(newOrder.id);
     return newOrder;
   }, {

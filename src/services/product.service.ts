@@ -13,6 +13,8 @@ interface AddonGroupInput {
   minSelect?: number;
   maxSelect?: number;
   addons: { name: string; price?: number; available?: boolean }[];
+  incrementable?: string;
+  incrementMode?: string;
 }
 
 interface AttributeInput {
@@ -178,7 +180,12 @@ export async function updateProduct(
             productId, 
             name: g.name, 
             minSelect: g.minSelect ?? 0, 
-            maxSelect: g.maxSelect ?? 10 
+            maxSelect: g.maxSelect ?? 10,
+            incrementable: Boolean(g.incrementable),
+            incrementMode:
+              g.incrementable
+                ? (g.incrementMode ?? 'multiple')
+                : null,
           })),
         });
         
