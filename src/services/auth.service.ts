@@ -29,7 +29,7 @@ async function buildUserResponse(user: any) {
 
 function generateTokens(userId: string, role: Role) {
   const accessToken = jwt.sign({ id: userId, role }, JWT_SECRET, {
-    expiresIn: '15m',
+    expiresIn: '10d',
   });
 
   const refreshToken = jwt.sign({ id: userId, role }, JWT_REFRESH_SECRET, {

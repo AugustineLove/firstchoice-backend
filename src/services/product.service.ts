@@ -135,6 +135,7 @@ export async function updateProduct(
   if (!vendor) throw new Error('Vendor profile not found');
 
   const product = await prisma.product.findUnique({ where: { id: productId } });
+  console.log(`Product: ${product}`)
   if (!product) throw new Error('Product not found');
   if (product.vendorId !== vendor.id) throw new Error('You do not own this product');
 

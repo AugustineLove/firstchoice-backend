@@ -203,6 +203,9 @@ model ProductAddonGroup {
   name       String         // "Extras", "Toppings", "Drinks"
   minSelect  Int            @default(0)
   maxSelect  Int            @default(10)
+  incrementable Boolean   @default(false)
+  incrementMode String?
+
   addons     ProductAddon[]
 }
 
