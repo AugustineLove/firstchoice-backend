@@ -388,18 +388,26 @@ async function emitOrderEvent(orderId: string, status: OrderStatus) {
 
 // In your orders route/controller, add:
 export async function getOrdersReadyForPickup() {
-  console.log('here in the get orders ready for pickup')
+  console.log('here in the get orders ready for pickup');
+
   return prisma.order.findMany({
     where: {
       orderStatus: 'READY_FOR_PICKUP',
       riderId: null,
     },
     include: {
-      vendor: { select: { businessName: true, address: true, phone: true } },
-      customer: { select: { name: true, phone: true } },
-      items: { include: { product: { select: { name: true } } } },
+      vendor: true,
+      customer: true,
+      rider: true,
+      items: {
+        include: {
+          product: true,
+        },
+      },
     },
-    orderBy: { createdAt: 'desc' },
+    orderBy: {
+      createdAt: 'desc',
+    },
   });
 }
 
