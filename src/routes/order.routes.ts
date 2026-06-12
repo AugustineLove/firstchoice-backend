@@ -12,19 +12,17 @@ orderRouter.use(authenticate);
 orderRouter.post('/', authorize('CUSTOMER'), OrderController.placeOrder);
 orderRouter.delete('/:id/cancel', authorize('CUSTOMER'), OrderController.cancelOrder);
 
-// Any authenticated role can view their own order
-orderRouter.get('/:id', OrderController.getOrderById);
-
-// Status updates — service layer enforces role permissions
-orderRouter.patch('/:id/status', OrderController.updateOrderStatus);
-
-// Admin only — view all orders
-orderRouter.get('/', authorize('ADMIN'), OrderController.getAllOrders);
-
-// GET /orders/ready-for-pickup  (rider-only)
 orderRouter.get('/ready-for-pickup', async (req, res) => {
   const orders = await getOrdersReadyForPickup();
   res.json({ success: true, data: orders });
 });
 
+// Any authenticated role can view their own order
+orderRouter.get('/:id', OrderController.getOrderById);
+
+// Status updates
+orderRouter.patch('/:id/status', OrderController.updateOrderStatus);
+
+// Admin only
+orderRouter.get('/', authorize('ADMIN'), OrderController.getAllOrders);
 export default orderRouter;
