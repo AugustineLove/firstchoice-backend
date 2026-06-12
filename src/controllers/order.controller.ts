@@ -92,3 +92,16 @@ export async function getAllOrders(req: Request, res: Response) {
     res.status(400).json({ success: false, message: err.message });
   }
 }
+
+export async function acceptOrder(req: AuthRequest, res: Response) {
+  try {
+    const delivery = await OrderService.riderAcceptOrder(
+      req.params.id as string,
+      req.user!.id
+    );
+    res.status(200).json({ success: true, data: delivery });
+  } catch (err: any) {
+    const code = err.message.includes('already') ? 409 : 400;
+    res.status(code).json({ success: false, message: err.message });
+  }
+}

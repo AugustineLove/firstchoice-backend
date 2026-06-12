@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import * as OrderController from '../controllers/order.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
-import { getOrdersReadyForPickup } from '../services/order.service';
+import { getOrdersReadyForPickup, riderAcceptOrder } from '../services/order.service';
 
 const orderRouter = Router();
 
@@ -11,7 +11,7 @@ orderRouter.use(authenticate);
 // Customer
 orderRouter.post('/', authorize('CUSTOMER'), OrderController.placeOrder);
 orderRouter.delete('/:id/cancel', authorize('CUSTOMER'), OrderController.cancelOrder);
-
+orderRouter.post('/:id/rider-accept', OrderController.acceptOrder);
 orderRouter.get('/ready-for-pickup', async (req, res) => {
   const orders = await getOrdersReadyForPickup();
   res.json({ success: true, data: orders });
