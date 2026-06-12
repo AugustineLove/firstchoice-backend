@@ -408,7 +408,7 @@ export async function riderAcceptOrder(orderId: string, riderUserId: string) {
   const rider = await prisma.rider.findUnique({ where: { userId: riderUserId } });
   if (!rider) throw new Error('Rider profile not found');
   if (rider.availability !== 'ONLINE') throw new Error('You must be online to accept');
-
+  const user = await prisma.user.findUnique({ where: {id: rider.userId}});
   return prisma.$transaction(async (tx) => {
     const order = await tx.order.findUnique({ where: { id: orderId } });
     if (!order) throw new Error('Order not found');
@@ -433,6 +433,14 @@ export async function riderAcceptOrder(orderId: string, riderUserId: string) {
       data: { availability: 'BUSY' },
     });
 
+    notifyUser(order.customerId, 'delivery:rider_accepted', {
+        deliveryId:   order.id,
+        riderName:   user?.name,
+        riderPhone:   user?.phone,
+        status:       'ACCEPTED',
+        timestamp:    new Date(),
+      });
     return updated;
   });
+  
 }
