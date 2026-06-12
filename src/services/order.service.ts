@@ -27,6 +27,7 @@ export async function placeOrder(
     deliveryAddress: string;
     paymentMethod: 'CASH' | 'MOMO';
     notes?: string;
+    subtotal: any;
   }
 ) {
   const vendor = await prisma.vendor.findUnique({ where: { id: data.vendorId } });
@@ -64,9 +65,9 @@ export async function placeOrder(
     };
   });
 
-  const subtotal    = orderItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
-  const deliveryFee = calculateDeliveryFee(subtotal);
-  const totalAmount = subtotal + deliveryFee;
+  // const subtotal    = orderItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+  const deliveryFee = calculateDeliveryFee(data.subtotal);
+  const totalAmount = data.subtotal + deliveryFee;
 
   const order = await prisma.$transaction(async (tx) => {
     const newOrder = await tx.order.create({
@@ -78,7 +79,7 @@ export async function placeOrder(
         recipientName: data.recipientName || null,
         recipientPhone: data.recipientPhone || null,
         notes:           data.notes || null,
-        subtotal,
+        subtotal: data.subtotal,
         deliveryFee,
         totalAmount,
         orderType: 'MARKETPLACE',
@@ -211,6 +212,21 @@ export async function updateOrderStatus(
       throw new Error('Order can no longer be cancelled');
   }
   if (newStatus ==='READY_FOR_PICKUP'){
+    console.log('READY_FOR_PICKUP reached');
+    console.log({
+      type: 'NEW_DELIVERY',
+      orderId: order.id,
+      pickupAddress: vendor?.address,
+      destinationAddress: order.deliveryAddress,
+      itemDescription: order.notes,
+      estimatedFee: order.deliveryFee,
+      paymentMethod: order.paymentMethod,
+      customer: {
+        name: order.recipientName,
+        phone: order.recipientPhone,
+      },
+      createdAt: order.createdAt
+    })
     notifyRiders('delivery:new_request', {
       type: 'NEW_DELIVERY',
       orderId: order.id,
@@ -370,3 +386,18 @@ async function emitOrderEvent(orderId: string, status: OrderStatus) {
   }
 }
 
+// In your orders route/controller, add:
+export async function getOrdersReadyForPickup() {
+  return prisma.order.findMany({
+    where: {
+      orderStatus: 'READY_FOR_PICKUP',
+      riderId: null,
+    },
+    include: {
+      vendor: { select: { businessName: true, address: true, phone: true } },
+      customer: { select: { name: true, phone: true } },
+      items: { include: { product: { select: { name: true } } } },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+}
