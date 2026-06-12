@@ -388,6 +388,7 @@ async function emitOrderEvent(orderId: string, status: OrderStatus) {
 
 // In your orders route/controller, add:
 export async function getOrdersReadyForPickup() {
+  console.log('here in the get orders ready for pickup')
   return prisma.order.findMany({
     where: {
       orderStatus: 'READY_FOR_PICKUP',
@@ -399,5 +400,39 @@ export async function getOrdersReadyForPickup() {
       items: { include: { product: { select: { name: true } } } },
     },
     orderBy: { createdAt: 'desc' },
+  });
+}
+
+// POST /orders/:id/rider-accept
+export async function riderAcceptOrder(orderId: string, riderUserId: string) {
+  const rider = await prisma.rider.findUnique({ where: { userId: riderUserId } });
+  if (!rider) throw new Error('Rider profile not found');
+  if (rider.availability !== 'ONLINE') throw new Error('You must be online to accept');
+
+  return prisma.$transaction(async (tx) => {
+    const order = await tx.order.findUnique({ where: { id: orderId } });
+    if (!order) throw new Error('Order not found');
+    if (order.orderStatus !== 'READY_FOR_PICKUP') throw new Error('Order already taken');
+    if (order.riderId) throw new Error('Order already assigned');
+
+    const updated = await tx.order.update({
+      where: { id: orderId },
+      data: {
+        riderId: rider.id,
+        orderStatus: 'RIDER_ASSIGNED',
+      },
+      include: {
+        customer: { select: { id: true, name: true, phone: true } },
+        vendor: { select: { businessName: true, address: true } },
+        rider: { include: { user: { select: { name: true, phone: true } } } },
+      },
+    });
+
+    await tx.rider.update({
+      where: { id: rider.id },
+      data: { availability: 'BUSY' },
+    });
+
+    return updated;
   });
 }
