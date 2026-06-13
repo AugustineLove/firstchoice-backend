@@ -5,7 +5,7 @@ import { AuthRequest } from '../interface/auth-request.interface.ts';
 export async function registerVendor(req: AuthRequest, res: Response) {
   console.log(req.user);
   try {
-    const { businessName, businessType, address, phone, logo, openingHours } =
+    const { businessName, businessType, address, phone, logo, openingHours, longitude, latitude } =
       req.body;
 
     if (!businessName || !businessType || !address || !phone) {

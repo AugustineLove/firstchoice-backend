@@ -435,7 +435,7 @@ export async function riderAcceptOrder(orderId: string, riderUserId: string) {
         rider: { include: { user: { select: { name: true, phone: true } } } },
       },
     });
-
+    console.log(user);
     await tx.rider.update({
       where: { id: rider.id },
       data: { availability: 'BUSY' },
