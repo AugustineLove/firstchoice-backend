@@ -138,6 +138,8 @@ model Vendor {
 
   products     Product[]
   orders       Order[]
+  longitude    String?
+  latitude     String?
 }
 
 model Product {
