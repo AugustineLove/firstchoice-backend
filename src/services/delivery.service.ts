@@ -15,23 +15,36 @@ function calculateDeliveryEstimate(
   destLng?: number,
 ): number {
   if (pickupLat && pickupLng && destLat && destLng) {
-    // Haversine rough distance → tiered pricing
-    const R    = 6371;
+    const R = 6371;
+
     const dLat = ((destLat - pickupLat) * Math.PI) / 180;
     const dLng = ((destLng - pickupLng) * Math.PI) / 180;
+
     const a =
       Math.sin(dLat / 2) ** 2 +
       Math.cos((pickupLat * Math.PI) / 180) *
         Math.cos((destLat * Math.PI) / 180) *
         Math.sin(dLng / 2) ** 2;
+
     const km = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
- 
-    if (km <= 1)  return 5;
-    if (km <= 3)  return 8;
-    if (km <= 7)  return 12;
-    if (km <= 15) return 18;
+
+    if (km <= 1) return 5;
+    if (km <= 1.5) return 6;
+    if (km <= 2) return 7;
+    if (km <= 3) return 8;
+    if (km <= 4) return 9;
+    if (km <= 5) return 10;
+    if (km <= 6) return 11;
+    if (km <= 7) return 12;
+    if (km <= 9) return 14;
+    if (km <= 11) return 16;
+    if (km <= 13) return 18;
+    if (km <= 15) return 20;
+    if (km <= 18) return 22;
+
     return 25;
   }
+
   return 10;
 }
  
