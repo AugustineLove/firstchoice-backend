@@ -31,16 +31,20 @@ function calculateDeliveryEstimate(
     if (km <= 1) return 5;
     if (km <= 1.5) return 6;
     if (km <= 2) return 7;
-    if (km <= 3) return 8;
-    if (km <= 4) return 9;
-    if (km <= 5) return 10;
-    if (km <= 6) return 11;
-    if (km <= 7) return 12;
-    if (km <= 9) return 14;
-    if (km <= 11) return 16;
-    if (km <= 13) return 18;
-    if (km <= 15) return 20;
-    if (km <= 18) return 22;
+    if (km <=2.5) return 8;
+    if (km <= 3) return 9;
+    if (km <= 3.5) return 10;
+    if (km <= 4) return 11;
+    if (km <= 4.5) return 12;
+    if (km <= 5) return 13;
+    if (km <= 5.5) return 14;
+    if (km <= 6) return 15;
+    if (km <= 6.5) return 16;
+    if (km <= 7) return 17;
+    if (km <= 7.5) return 18;
+    if (km <= 8) return 19;
+    if (km <= 8.5) return 20;
+    if (km <= 9) return 21;
 
     return 25;
   }
