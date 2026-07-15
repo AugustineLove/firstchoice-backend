@@ -49,7 +49,7 @@ function calculateDeliveryEstimate(
     return 25;
   }
 
-  return 10;
+  return 0;
 }
  
 export async function getDeliveryById(deliveryId: string, userId: string) {
