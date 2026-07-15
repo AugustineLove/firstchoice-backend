@@ -105,6 +105,8 @@ model User {
   resetPasswordToken   String?
   resetPasswordExpiry  DateTime?
 
+  firebaseUid String? @unique
+
 }
 
 model Rider {
@@ -329,3 +331,4 @@ model Transaction {
   paymentStatus PaymentStatus @default(PENDING)
   recordedAt    DateTime      @default(now())
 }
+
