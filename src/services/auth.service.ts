@@ -7,6 +7,8 @@ import { sendPasswordResetEmail } from './email.service';
 dotenv.config();
 import { getAuth } from 'firebase-admin/auth';
 import crypto from 'crypto';
+import firebase from 'firebase/compat/app';
+import { firebaseAuth } from '../config/firebase';
 
 
 const JWT_SECRET = process.env.JWT_SECRET!;
@@ -152,7 +154,6 @@ export async function resetPassword(phone: string, otp: string, newPassword: str
 }
 
 // Reuse whatever firebase-admin app instance you already initialized for FCM.
-const firebaseAuth = getAuth();
 
 async function ensureFirebaseMirror(user: { id: string; email: string | null; firebaseUid: string | null; name: string }) {
   if (!user.email) throw new Error('No email is on file for this account. Please contact support to reset your password.');
