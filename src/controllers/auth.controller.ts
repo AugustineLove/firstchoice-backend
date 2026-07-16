@@ -80,9 +80,9 @@ export async function me(req: AuthRequest, res: Response) {
 }
 
 export async function resetPassword(req: Request, res: Response) {
-  const error = validateResetPassword(req.body.phone);
-  console.log(`Error: ${error}`)
-  if (error) { res.status(400).json({ success: false, message: error }); return; }
+  // const error = validateResetPassword(req.body.phone);
+  // console.log(`Error: ${error}`)
+  // if (error) { res.status(400).json({ success: false, message: error }); return; }
   try {
     await AuthService.resetPassword(req.body.token, req.body.phone);
     res.status(200).json({ success: true, message: 'Password reset successfully' });
