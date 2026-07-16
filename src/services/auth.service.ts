@@ -137,23 +137,63 @@ function maskEmail(email: string) {
   return `${visible}${'*'.repeat(Math.max(namePart.length - 2, 1))}@${domain}`;
 }
 
-// export async function resetPassword(phone: string, otp: string, newPassword: string) {
-//   const user = await prisma.user.findUnique({ where: { phone } });
-//   if (!user) throw new Error('Invalid request');
-//   if (!user.resetPasswordToken || !user.resetPasswordExpiry) throw new Error('No password reset was requested');
-//   if (user.resetPasswordExpiry < new Date()) throw new Error('This code has expired. Please request a new one');
+export async function resetPassword(
+  token: string,
+  newPassword: string
+) {
 
-//   const isValid = await bcrypt.compare(otp, user.resetPasswordToken);
-//   if (!isValid) throw new Error('Invalid code');
+  const user = await prisma.user.findFirst({
+    where: {
+      resetPasswordToken: token,
+    },
+  });
 
-//   const passwordHash = await bcrypt.hash(newPassword, 10);
-//   await prisma.user.update({
-//     where: { id: user.id },
-//     data: { passwordHash, resetPasswordToken: null, resetPasswordExpiry: null },
-//   });
-// }
 
-export async function resetPassword(phone: string) {
+  if (!user) {
+    throw new Error("Invalid or expired reset link");
+  }
+
+
+  if (!user.resetPasswordExpiry) {
+    throw new Error("No password reset request found");
+  }
+
+
+  if (user.resetPasswordExpiry < new Date()) {
+
+    throw new Error(
+      "This reset link has expired. Please request a new one"
+    );
+
+  }
+
+
+  const passwordHash = await bcrypt.hash(
+    newPassword,
+    10
+  );
+
+
+  await prisma.user.update({
+    where: {
+      id: user.id,
+    },
+    data: {
+      passwordHash,
+
+      // remove token after successful reset
+      resetPasswordToken: null,
+      resetPasswordExpiry: null,
+    },
+  });
+
+
+  return {
+    message: "Password reset successfully",
+  };
+}
+
+export async function resetPasswordEmail(phone: string) {
   const user = await prisma.user.findUnique({
     where: { phone },
   });
@@ -169,7 +209,7 @@ export async function resetPassword(phone: string) {
   const token = crypto.randomBytes(32).toString("hex");
 
   const hashedToken = await bcrypt.hash(token, 10);
-
+  console.log(`Token: ${token}, HashedToken: ${hashedToken}`)
   await prisma.user.update({
     where: { id: user.id },
     data: {
@@ -183,6 +223,7 @@ export async function resetPassword(phone: string) {
     `https://firstchoice-ten.vercel.app/reset-password?token=${token}&email=${encodeURIComponent(user.email)}`;
 
 
+    console.log(`Email: ${user.email}, Name: ${user.name}, ResetLink: ${resetLink}`)
   await sendPasswordResetEmail(
     user.email,
     user.name,

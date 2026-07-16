@@ -35,7 +35,7 @@ export function validateForgotPassword(body: any): string | null {
 
 export function validateResetPassword(body: any): string | null {
   if (!body.phone) return 'Phone number is required';
-  if (!body.otp || body.otp.length !== 6) return 'A valid 6-digit code is required';
-  if (!body.newPassword || body.newPassword.length < 6) return 'Password must be at least 6 characters';
+  // if (!body.otp || body.otp.length !== 6) return 'A valid 6-digit code is required';
+  // if (!body.newPassword || body.newPassword.length < 6) return 'Password must be at least 6 characters';
   return null;
 }
