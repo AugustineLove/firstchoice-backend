@@ -213,7 +213,7 @@ export async function resetPasswordEmail(phone: string) {
   await prisma.user.update({
     where: { id: user.id },
     data: {
-      resetPasswordToken: hashedToken,
+      resetPasswordToken: token,
       resetPasswordExpiry: new Date(Date.now() + 15 * 60 * 1000),
     },
   });
