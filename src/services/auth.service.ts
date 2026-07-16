@@ -137,20 +137,62 @@ function maskEmail(email: string) {
   return `${visible}${'*'.repeat(Math.max(namePart.length - 2, 1))}@${domain}`;
 }
 
-export async function resetPassword(phone: string, otp: string, newPassword: string) {
-  const user = await prisma.user.findUnique({ where: { phone } });
-  if (!user) throw new Error('Invalid request');
-  if (!user.resetPasswordToken || !user.resetPasswordExpiry) throw new Error('No password reset was requested');
-  if (user.resetPasswordExpiry < new Date()) throw new Error('This code has expired. Please request a new one');
+// export async function resetPassword(phone: string, otp: string, newPassword: string) {
+//   const user = await prisma.user.findUnique({ where: { phone } });
+//   if (!user) throw new Error('Invalid request');
+//   if (!user.resetPasswordToken || !user.resetPasswordExpiry) throw new Error('No password reset was requested');
+//   if (user.resetPasswordExpiry < new Date()) throw new Error('This code has expired. Please request a new one');
 
-  const isValid = await bcrypt.compare(otp, user.resetPasswordToken);
-  if (!isValid) throw new Error('Invalid code');
+//   const isValid = await bcrypt.compare(otp, user.resetPasswordToken);
+//   if (!isValid) throw new Error('Invalid code');
 
-  const passwordHash = await bcrypt.hash(newPassword, 10);
+//   const passwordHash = await bcrypt.hash(newPassword, 10);
+//   await prisma.user.update({
+//     where: { id: user.id },
+//     data: { passwordHash, resetPasswordToken: null, resetPasswordExpiry: null },
+//   });
+// }
+
+export async function resetPassword(phone: string) {
+  const user = await prisma.user.findUnique({
+    where: { phone },
+  });
+
+  if (!user) {
+    throw new Error("No account found with this phone number");
+  }
+
+  if (!user.email) {
+    throw new Error("No email associated with this account");
+  }
+
+  const token = crypto.randomBytes(32).toString("hex");
+
+  const hashedToken = await bcrypt.hash(token, 10);
+
   await prisma.user.update({
     where: { id: user.id },
-    data: { passwordHash, resetPasswordToken: null, resetPasswordExpiry: null },
+    data: {
+      resetPasswordToken: hashedToken,
+      resetPasswordExpiry: new Date(Date.now() + 15 * 60 * 1000),
+    },
   });
+
+
+  const resetLink =
+    `https://firstchoice-ten.vercel.app/reset-password?token=${token}&email=${encodeURIComponent(user.email)}`;
+
+
+  await sendPasswordResetEmail(
+    user.email,
+    user.name,
+    resetLink
+  );
+
+
+  return {
+    message: "Password reset link sent",
+  };
 }
 
 // Reuse whatever firebase-admin app instance you already initialized for FCM.
