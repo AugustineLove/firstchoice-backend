@@ -33,8 +33,8 @@ export function validateForgotPassword(body: any): string | null {
   return null;
 }
 
-export function validateResetPassword(body: any): string | null {
-  if (!body.phone) return 'Phone number is required';
+export function validateResetPassword(phone: any): string | null {
+  if (!phone) return 'Phone number is required';
   // if (!body.otp || body.otp.length !== 6) return 'A valid 6-digit code is required';
   // if (!body.newPassword || body.newPassword.length < 6) return 'Password must be at least 6 characters';
   return null;
