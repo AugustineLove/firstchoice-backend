@@ -188,10 +188,13 @@ export async function requestPasswordReset(phone: string) {
 export async function syncResetPassword(idToken: string, newPassword: string) {
   const decoded = await firebaseAuth.verifyIdToken(idToken);
 
+  console.log(decoded)
   const user = await prisma.user.findUnique({ where: { firebaseUid: decoded.uid } });
+  console.log(JSON.stringify(user));
   if (!user) throw new Error('No matching account found');
   if (user.email !== decoded.email) throw new Error('Account mismatch');
 
   const passwordHash = await bcrypt.hash(newPassword, 10);
+  console.log('Hashed password');
   await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
 }
