@@ -104,26 +104,26 @@ export async function resetPasswordEmail(req: Request, res: Response) {
   }
 }
 
-export async function forgotPassword(req: Request, res: Response) {
-  if (!req.body.phone) { res.status(400).json({ success: false, message: 'Phone number is required' }); return; }
-  try {
-    const result = await AuthService.requestPasswordReset(req.body.phone);
-    res.status(200).json({ success: true, data: result });
-  } catch (err: any) {
-    res.status(400).json({ success: false, message: err.message });
-  }
-}
+// export async function forgotPassword(req: Request, res: Response) {
+//   if (!req.body.phone) { res.status(400).json({ success: false, message: 'Phone number is required' }); return; }
+//   try {
+//     const result = await AuthService.requestPasswordReset(req.body.phone);
+//     res.status(200).json({ success: true, data: result });
+//   } catch (err: any) {
+//     res.status(400).json({ success: false, message: err.message });
+//   }
+// }
 
-export async function syncResetPassword(req: Request, res: Response) {
-  const { idToken, newPassword } = req.body;
-  if (!idToken || !newPassword || newPassword.length < 6) {
-    res.status(400).json({ success: false, message: 'Invalid request' });
-    return;
-  }
-  try {
-    await AuthService.syncResetPassword(idToken, newPassword);
-    res.status(200).json({ success: true, message: 'Password synced' });
-  } catch (err: any) {
-    res.status(400).json({ success: false, message: err.message });
-  }
-}
+// export async function syncResetPassword(req: Request, res: Response) {
+//   const { idToken, newPassword } = req.body;
+//   if (!idToken || !newPassword || newPassword.length < 6) {
+//     res.status(400).json({ success: false, message: 'Invalid request' });
+//     return;
+//   }
+//   try {
+//     await AuthService.syncResetPassword(idToken, newPassword);
+//     res.status(200).json({ success: true, message: 'Password synced' });
+//   } catch (err: any) {
+//     res.status(400).json({ success: false, message: err.message });
+//   }
+// }

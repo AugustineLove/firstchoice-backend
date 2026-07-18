@@ -2,20 +2,16 @@ import * as admin from 'firebase-admin';
 import { prisma } from '../config/prisma';
 import path from 'path';
 
-// ─── Init Firebase Admin ──────────────────────────────────
-let initialized = false;
+const app =
+    admin.apps.length > 0
+        ? admin.app()
+        : admin.initializeApp({
+              credential: admin.credential.cert(
+                  JSON.parse(process.env.FIREBASE_KEY!)
+              ),
+          });
 
-function getApp(): admin.app.App {
-  if (!initialized) {
-    admin.initializeApp({
-      credential: admin.credential.cert(
-        JSON.parse(process.env.FIREBASE_KEY!)
-      ),
-    });
-    initialized = true;
-  }
-  return admin.app();
-}
+export default app;
 
 // ─── Core send function ───────────────────────────────────
 
@@ -67,7 +63,7 @@ async function sendToUser(userId: string, payload: PushPayload): Promise<boolean
     // 2. Safe log logging
     console.log("CLEANED PAYLOAD:", JSON.stringify({ title: safeTitle, body: safeBody, data: safeData }, null, 2));
 
-    await getApp().messaging().send({
+    await app.messaging().send({
       token: cleanToken,
       notification: {
         title: safeTitle,
