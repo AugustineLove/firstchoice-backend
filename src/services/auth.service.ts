@@ -8,7 +8,6 @@ dotenv.config();
 import { getAuth } from 'firebase-admin/auth';
 import crypto from 'crypto';
 import firebase from 'firebase/compat/app';
-import { firebaseAuth } from '../config/firebase';
 
 
 const JWT_SECRET = process.env.JWT_SECRET!;
@@ -238,46 +237,32 @@ export async function resetPasswordEmail(phone: string) {
 
 // Reuse whatever firebase-admin app instance you already initialized for FCM.
 
-async function ensureFirebaseMirror(user: { id: string; email: string | null; firebaseUid: string | null; name: string }) {
-  if (!user.email) throw new Error('No email is on file for this account. Please contact support to reset your password.');
-  if (user.firebaseUid) return user.firebaseUid;
+// async function ensureFirebaseMirror(user: { id: string; email: string | null; firebaseUid: string | null; name: string }) {
+//   if (!user.email) throw new Error('No email is on file for this account. Please contact support to reset your password.');
+//   if (user.firebaseUid) return user.firebaseUid;
 
-  let firebaseUser;
-  try {
-    firebaseUser = await firebaseAuth.getUserByEmail(user.email);
-  } catch {
-    firebaseUser = await firebaseAuth.createUser({
-      email: user.email,
-      password: crypto.randomBytes(16).toString('hex'), // never used to log in directly
-      displayName: user.name,
-      emailVerified: false,
-    });
-  }
+//   let firebaseUser;
+//   try {
+//     firebaseUser = await firebaseAuth.getUserByEmail(user.email);
+//   } catch {
+//     firebaseUser = await firebaseAuth.createUser({
+//       email: user.email,
+//       password: crypto.randomBytes(16).toString('hex'), // never used to log in directly
+//       displayName: user.name,
+//       emailVerified: false,
+//     });
+//   }
 
-  await prisma.user.update({ where: { id: user.id }, data: { firebaseUid: firebaseUser.uid } });
-  return firebaseUser.uid;
-}
+//   await prisma.user.update({ where: { id: user.id }, data: { firebaseUid: firebaseUser.uid } });
+//   return firebaseUser.uid;
+// }
 
-export async function requestPasswordReset(phone: string) {
-  const user = await prisma.user.findUnique({ where: { phone } });
-  if (!user) throw new Error('No account found with that phone number');
+// export async function requestPasswordReset(phone: string) {
+//   const user = await prisma.user.findUnique({ where: { phone } });
+//   if (!user) throw new Error('No account found with that phone number');
 
-  await ensureFirebaseMirror(user);
+//   await ensureFirebaseMirror(user);
 
-  // Flutter will call FirebaseAuth.sendPasswordResetEmail directly with this address.
-  return { email: user.email! };
-}
-
-export async function syncResetPassword(idToken: string, newPassword: string) {
-  const decoded = await firebaseAuth.verifyIdToken(idToken);
-
-  console.log(decoded)
-  const user = await prisma.user.findUnique({ where: { firebaseUid: decoded.uid } });
-  console.log(JSON.stringify(user));
-  if (!user) throw new Error('No matching account found');
-  if (user.email !== decoded.email) throw new Error('Account mismatch');
-
-  const passwordHash = await bcrypt.hash(newPassword, 10);
-  console.log('Hashed password');
-  await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
-}
+//   // Flutter will call FirebaseAuth.sendPasswordResetEmail directly with this address.
+//   return { email: user.email! };
+// }
