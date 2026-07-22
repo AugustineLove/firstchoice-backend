@@ -2,6 +2,11 @@ import { Request, Response } from 'express';
 import * as AdminService from '../services/admin.service';
 import { UserStatus, VendorStatus } from '@prisma/client';
 
+
+function handleError(res: Response, err: any) {
+  res.status(400).json({ success: false, message: err.message || 'Something went wrong' });
+}
+
 export async function getOverviewStats(req: Request, res: Response) {
   try {
     const stats = await AdminService.getOverviewStats();
@@ -61,6 +66,23 @@ export async function getAllVendors(req: Request, res: Response) {
   }
 }
 
+export async function updateVendorProfile(
+  req: Request<{ vendorId: string }>,
+  res: Response
+) {
+  try {
+    const data = await AdminService.updateVendorProfile(
+      req.params.vendorId,
+      req.body
+    );
+
+    res.json({ success: true, data });
+
+  } catch (err) {
+    handleError(res, err);
+  }
+}
+
 export async function updateVendorStatus(req: Request, res: Response) {
   try {
     const { status } = req.body;
@@ -81,6 +103,21 @@ export async function updateVendorStatus(req: Request, res: Response) {
   }
 }
 
+export async function addVendorProduct(req: Request<{ vendorId: string}>, res: Response) {
+  try {
+    const data = await AdminService.createProductForVendor(req.params.vendorId, req.body);
+    res.status(201).json({ success: true, data });
+  } catch (err) { handleError(res, err); }
+}
+
+export async function deleteVendorProduct(req: Request< { productId: string} >, res: Response) {
+  try {
+    const data = await AdminService.deleteProductAdmin(req.params.productId);
+    res.json({ success: true, data });
+  } catch (err) { handleError(res, err); }
+}
+
+
 export async function getAllRiders(req: Request, res: Response) {
   try {
     const { availability, page, limit } = req.query;
@@ -93,6 +130,13 @@ export async function getAllRiders(req: Request, res: Response) {
   } catch (err: any) {
     res.status(400).json({ success: false, message: err.message });
   }
+}
+
+export async function createVendor(req: Request, res: Response) {
+  try {
+    const { vendor, tempPassword } = await AdminService.createVendorWithOwner(req.body);
+    res.status(201).json({ success: true, data: vendor, tempPassword });
+  } catch (err) { handleError(res, err); }
 }
 
 export async function assignRiderToOrder(req: Request, res: Response) {
@@ -129,3 +173,4 @@ export async function getRiderAnalytics(req: Request, res: Response) {
     res.status(400).json({ success: false, message: err.message });
   }
 }
+

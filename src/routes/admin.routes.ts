@@ -17,6 +17,13 @@ adminRouter.patch('/users/:userId/status', AdminController.updateUserStatus);
 // Vendors
 adminRouter.get('/vendors', AdminController.getAllVendors);
 adminRouter.patch('/vendors/:vendorId/status', AdminController.updateVendorStatus);
+// Vendors
+adminRouter.get('/vendors', AdminController.getAllVendors);
+adminRouter.post('/vendors', AdminController.createVendor);                          // NEW
+adminRouter.patch('/vendors/:vendorId', AdminController.updateVendorProfile);         // NEW
+adminRouter.patch('/vendors/:vendorId/status', AdminController.updateVendorStatus);
+adminRouter.post('/vendors/:vendorId/products', AdminController.addVendorProduct);    // NEW
+adminRouter.delete('/products/:productId', AdminController.deleteVendorProduct);      // NEW
 
 // Riders
 adminRouter.get('/riders', AdminController.getAllRiders);

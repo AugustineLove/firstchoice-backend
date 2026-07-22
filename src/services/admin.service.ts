@@ -1,7 +1,8 @@
 import * as NotificationService from './notification.service';
 import { UserStatus, VendorStatus } from '@prisma/client';
 import { prisma } from '../config/prisma';
-
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 // ─── OVERVIEW STATS ─────────────────────────────────────
 
 export async function getOverviewStats() {
@@ -316,4 +317,96 @@ export async function getRiderAnalytics() {
   });
 
   return { topRiders, availabilitySummary };
+}
+
+
+export async function createVendorWithOwner(data: {
+  businessName: string;
+  businessType: string;
+  address: string;
+  phone: string;
+  openingHours?: string;
+  logo?: string;
+  ownerName: string;
+  ownerPhone: string;
+  ownerEmail?: string;
+  password?: string;
+}) {
+  const existingUser = await prisma.user.findUnique({ where: { phone: data.ownerPhone } });
+  if (existingUser) throw new Error('A user with this phone number already exists');
+
+  const tempPassword = data.password?.trim() || crypto.randomBytes(4).toString('hex');
+  const passwordHash = await bcrypt.hash(tempPassword, 10);
+
+  const vendor = await prisma.$transaction(async (tx) => {
+    const user = await tx.user.create({
+      data: {
+        name: data.ownerName.trim(),
+        phone: data.ownerPhone.trim(),
+        email: data.ownerEmail?.trim() || null,
+        passwordHash,
+        role: 'VENDOR',
+        status: 'ACTIVE',
+      },
+    });
+
+    return tx.vendor.create({
+      data: {
+        userId: user.id,
+        businessName: data.businessName.trim(),
+        businessType: data.businessType,
+        address: data.address.trim(),
+        phone: data.phone.trim(),
+        openingHours: data.openingHours || null,
+        logo: data.logo || null,
+        status: 'ACTIVE', // admin-created vendors are pre-approved
+      },
+      include: { user: { select: { id: true, name: true, phone: true, email: true } } },
+    });
+  });
+
+  return { vendor, tempPassword };
+}
+
+export async function updateVendorProfile(
+  vendorId: string,
+  data: { businessName?: string; businessType?: string; address?: string; phone?: string; openingHours?: string; logo?: string; }
+) {
+  const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
+  if (!vendor) throw new Error('Vendor not found');
+
+  return prisma.vendor.update({
+    where: { id: vendorId },
+    data,
+    include: { user: { select: { name: true, phone: true, email: true } } },
+  });
+}
+
+// ─── PRODUCT MANAGEMENT ON BEHALF OF A VENDOR ──────────
+
+export async function createProductForVendor(
+  vendorId: string,
+  data: { name: string; category: string; price: number; stock?: number; images?: string[]; available?: boolean; }
+) {
+  const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
+  if (!vendor) throw new Error('Vendor not found');
+
+  return prisma.product.create({
+    data: {
+      vendorId,
+      name: data.name.trim(),
+      category: data.category,
+      price: data.price,
+      stock: data.stock ?? 0,
+      images: data.images || [],
+      available: data.available ?? true,
+    },
+  });
+}
+
+export async function deleteProductAdmin(productId: string) {
+  const product = await prisma.product.findUnique({ where: { id: productId } });
+  if (!product) throw new Error('Product not found');
+  await prisma.product.delete({ where: { id: productId } });
+  return { message: 'Product deleted successfully' };
 }
