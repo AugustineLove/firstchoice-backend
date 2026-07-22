@@ -15,4 +15,5 @@ vendorRouter.patch('/me/profile', authenticate, VendorController.updateVendorPro
 vendorRouter.get('/me/orders', authenticate, authorize('VENDOR'), VendorController.getVendorOrders);
 vendorRouter.get('/me/stats', authenticate, authorize('VENDOR'), VendorController.getVendorStats);
 
+
 export default vendorRouter;

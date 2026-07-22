@@ -2,17 +2,14 @@ import * as admin from 'firebase-admin';
 import { prisma } from '../config/prisma';
 import path from 'path';
 
-
-const serviceAccount = JSON.parse(process.env.FIREBASE_KEY as string);
-
 const app =
-    admin.apps.length > 0
-        ? admin.app()
-        : admin.initializeApp({
-              credential: admin.credential.cert(
-                  JSON.parse(serviceAccount)
-              ),
-          });
+  admin.apps.length > 0
+    ? admin.app()
+    : // This converts the string to a valid JSON object
+    admin.initializeApp({
+      credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_KEY!)) 
+    });
+
 
 export default app;
 
