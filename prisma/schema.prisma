@@ -259,6 +259,8 @@ model Order {
 
   items           OrderItem[]
   transaction     Transaction?
+  deliveryLatitude    Float?
+  deliveryLongitude   Float?
 }
 
 model OrderItem {
