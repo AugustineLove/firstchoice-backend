@@ -261,6 +261,10 @@ model Order {
   transaction     Transaction?
   deliveryLatitude    Float?
   deliveryLongitude   Float?
+
+  pickupLatitude    Float?
+  pickupLongitude   Float?
+
 }
 
 model OrderItem {
