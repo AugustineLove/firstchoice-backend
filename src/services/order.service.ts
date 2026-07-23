@@ -144,10 +144,11 @@ export async function placeOrder(
           subtotal: data.subtotal,
           pickupLatitude: Number(vendor.latitude) || null,
           pickupLongitude: Number(vendor.longitude) || null,
-          vendorAddress: vendor.address,
+          vendorAddress: vendor.businessName,
           deliveryFee,
           totalAmount,
           orderType: 'MARKETPLACE',
+           orderStatus: 'READY_FOR_PICKUP',
           items: { create: orderItems },
         },
         include: {
@@ -199,11 +200,12 @@ export async function placeOrder(
       notes: data.note.trim(),
       pickupLatitude: Number(vendor.latitude) || null,
       pickupLongitude: Number(vendor.longitude) || null,
-      vendorAddress: vendor.address,
+      vendorAddress: vendor.businessName,
       subtotal: 0,          // unknown until vendor confirms
       deliveryFee,
       totalAmount: deliveryFee, // updated once vendor sets item pricing
       orderType: 'MARKETPLACE',
+       orderStatus: 'READY_FOR_PICKUP',
     },
     include: {
       vendor: { select: { businessName: true, logo: true, phone: true } },
@@ -211,6 +213,7 @@ export async function placeOrder(
   });
 
   await NotificationService.notifyNewOrder(order.id);
+  await NotificationService.notifyNewDelivery(order.id);
   return order;
 }
 
@@ -261,10 +264,10 @@ export async function getOrderById(orderId: string, userId: string) {
 // Rider: pick up, deliver
 // Customer/Admin: cancel
 const validTransitions: Record<OrderStatus, OrderStatus[]> = {
-  PENDING: ['ACCEPTED', 'CANCELLED'],
-  ACCEPTED: ['PREPARING', 'CANCELLED'],
-  PREPARING: ['READY_FOR_PICKUP'],
-  READY_FOR_PICKUP: ['RIDER_ASSIGNED'],
+  PENDING: [],
+  ACCEPTED: [],
+  PREPARING: [],
+  READY_FOR_PICKUP: ['CANCELLED'],
   RIDER_ASSIGNED: ['PICKED_UP'],
   PICKED_UP: ['DELIVERED'],
   DELIVERED: [],
@@ -426,6 +429,7 @@ export async function getAllOrders(filters: {
     prisma.order.count({ where }),
   ]);
 
+  console.log(`Orders: ${orders}`)
   return {
     orders,
     pagination: {

@@ -1,6 +1,7 @@
 import * as admin from 'firebase-admin';
 import { prisma } from '../config/prisma';
 import path from 'path';
+import { notifyRiders } from '../socket/socket.manager';
 
 const app =
   admin.apps.length > 0
@@ -150,6 +151,32 @@ export async function notifyNewOrder(orderId: string): Promise<void> {
     data:  { type: 'NEW_ORDER', orderId, screen: 'admin_orders' },
   });
 }
+
+    function notifyRidersOfJob(order: {
+      id: string;
+      deliveryAddress: string;
+      notes: string | null;
+      deliveryFee: number;
+      paymentMethod: string;
+      recipientName: string | null;
+      recipientPhone: string | null;
+      createdAt: Date;
+    }, vendorAddress: string | null | undefined) {
+      notifyRiders('delivery:new_request', {
+        type: 'NEW_DELIVERY',
+        orderId: order.id,
+        pickupAddress: vendorAddress,
+        destinationAddress: order.deliveryAddress,
+        itemDescription: order.notes,
+        estimatedFee: order.deliveryFee,
+        paymentMethod: order.paymentMethod,
+        customer: {
+          name: order.recipientName,
+          phone: order.recipientPhone,
+        },
+        createdAt: order.createdAt,
+      });
+    }
 
 export async function notifyOrderStatusChange(
   orderId: string,
