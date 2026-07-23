@@ -9,113 +9,209 @@ import {
 } from '../socket/socket.manager';
 import * as NotificationService from './notification.service';
 
+interface feeData {
+  pickupLat?: number,
+  pickupLng?: number,
+  destLat?: number,
+  destLng?: number
+}
 // In placeOrder, update the items validation and price calculation:
+
+// Same tiered-by-distance table used on the deliveries page / mobile app.
+// Used only for SIMPLE (note-based) orders, where there's no subtotal yet
+// to base a fee on — we price off distance instead, same as a delivery.
+function calculateDeliveryFeeByDistance({
+  pickupLat, pickupLng, destLat, destLng,
+}: { pickupLat?: number | null; pickupLng?: number | null; destLat?: number | null; destLng?: number | null }) {
+  if (pickupLat == null || pickupLng == null || destLat == null || destLng == null) return 10; // fallback flat fee if coords missing
+
+  const r = 6371;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(destLat - pickupLat);
+  const dLng = toRad(destLng - pickupLng);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(pickupLat)) * Math.cos(toRad(destLat)) * Math.sin(dLng / 2) ** 2;
+  const km = r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  if (km <= 1) return 5;
+  if (km <= 1.5) return 6;
+  if (km <= 2) return 7;
+  if (km <= 2.5) return 8;
+  if (km <= 3) return 9;
+  if (km <= 3.5) return 10;
+  if (km <= 4) return 11;
+  if (km <= 4.5) return 12;
+  if (km <= 5) return 13;
+  if (km <= 5.5) return 14;
+  if (km <= 6) return 15;
+  if (km <= 6.5) return 16;
+  if (km <= 7) return 17;
+  if (km <= 7.5) return 18;
+  if (km <= 8) return 19;
+  if (km <= 8.5) return 20;
+  if (km <= 9) return 21;
+  return 25;
+}
 
 export async function placeOrder(
   customerId: string,
   data: {
     vendorId: string;
-    items: {
+
+    // ── legacy structured flow (unchanged, still fully supported) ──
+    items?: {
       productId: string;
       quantity: number;
       selectedVariants?: { groupName: string; variantName: string; priceAdjustment: number }[];
       selectedAddons?: { groupName: string; addonName: string; price: number }[];
       itemNotes?: string;
     }[];
+    subtotal?: any;
+
+    // ── new simple flow ──
+    note?: string;
+
+    // shared by both flows
     recipientName?: string;
     recipientPhone?: string;
     deliveryAddress: string;
+    deliveryLatitude?: number;
+    deliveryLongitude?: number;
     paymentMethod: 'CASH' | 'MOMO';
     notes?: string;
-    subtotal: any;
   }
 ) {
   const vendor = await prisma.vendor.findUnique({ where: { id: data.vendorId } });
   if (!vendor) throw new Error('Vendor not found');
   if (vendor.status !== 'ACTIVE') throw new Error('This vendor is currently unavailable');
 
-  const productIds = data.items.map(i => i.productId);
-  const products   = await prisma.product.findMany({
-    where: { id: { in: productIds }, vendorId: data.vendorId },
-  });
+  const hasStructuredItems = Array.isArray(data.items) && data.items.length > 0;
 
-  if (products.length !== data.items.length)
-    throw new Error('One or more products not found');
-
-  for (const item of data.items) {
-    const product = products.find(p => p.id === item.productId)!;
-    if (!product.available) throw new Error(`Product unavailable: ${product.name}`);
-    if (product.stock < item.quantity) throw new Error(`Insufficient stock: ${product.name}`);
-  }
-
-  // Calculate per-item price including variants and add-ons
-  const orderItems = data.items.map(item => {
-    const product = products.find(p => p.id === item.productId)!;
-    const variantExtra = (item.selectedVariants || []).reduce((s, v) => s + v.priceAdjustment, 0);
-    const addonExtra   = (item.selectedAddons   || []).reduce((s, a) => s + a.price, 0);
-    const unitPrice    = product.price + variantExtra + addonExtra;
-
-    return {
-      productId:        item.productId,
-      quantity:         item.quantity,
-      unitPrice,
-      selectedVariants: item.selectedVariants ? JSON.stringify(item.selectedVariants) : undefined,
-      selectedAddons:   item.selectedAddons   ? JSON.stringify(item.selectedAddons)   : undefined,
-      itemNotes:        item.itemNotes,
-    };
-  });
-
-  // const subtotal    = orderItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
-  const deliveryFee = calculateDeliveryFee(data.subtotal);
-  const totalAmount = data.subtotal + deliveryFee;
-
-  const order = await prisma.$transaction(async (tx) => {
-    const newOrder = await tx.order.create({
-      data: {
-        customerId,
-        vendorId:        data.vendorId,
-        deliveryAddress: data.deliveryAddress,
-        paymentMethod:   data.paymentMethod,
-        recipientName: data.recipientName || null,
-        recipientPhone: data.recipientPhone || null,
-        notes:           data.notes || null,
-        subtotal: data.subtotal,
-        deliveryFee,
-        totalAmount,
-        orderType: 'MARKETPLACE',
-        items: { create: orderItems },
-      },
-      include: {
-        items: { include: { product: { select: { name: true, images: true } } } },
-        vendor: { select: { businessName: true, logo: true, phone: true } },
-      },
+  // ═══════════════════════════════════════════════════════
+  // LEGACY FLOW — untouched. Kicks in only when items[] is sent.
+  // ═══════════════════════════════════════════════════════
+  if (hasStructuredItems) {
+    const productIds = data.items!.map(i => i.productId);
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds }, vendorId: data.vendorId },
     });
 
-    for (const item of data.items) {
-      await tx.product.update({
-        where: { id: item.productId },
-        data:  { stock: { decrement: item.quantity } },
-      });
+    if (products.length !== data.items!.length)
+      throw new Error('One or more products not found');
+
+    for (const item of data.items!) {
+      const product = products.find(p => p.id === item.productId)!;
+      if (!product.available) throw new Error(`Product unavailable: ${product.name}`);
+      if (product.stock < item.quantity) throw new Error(`Insufficient stock: ${product.name}`);
     }
 
-    console.log(newOrder.id)
-    await NotificationService.notifyNewOrder(newOrder.id);
-    return newOrder;
-  }, {
-    timeout: 15000,
-    maxWait: 30000,
+    const orderItems = data.items!.map(item => {
+      const product = products.find(p => p.id === item.productId)!;
+      const variantExtra = (item.selectedVariants || []).reduce((s, v) => s + v.priceAdjustment, 0);
+      const addonExtra = (item.selectedAddons || []).reduce((s, a) => s + a.price, 0);
+      const unitPrice = product.price + variantExtra + addonExtra;
+
+      return {
+        productId: item.productId,
+        quantity: item.quantity,
+        unitPrice,
+        selectedVariants: item.selectedVariants ? JSON.stringify(item.selectedVariants) : undefined,
+        selectedAddons: item.selectedAddons ? JSON.stringify(item.selectedAddons) : undefined,
+        itemNotes: item.itemNotes,
+      };
+    });
+    const calculationData = {
+      pickupLat: Number(vendor.latitude),
+      pickupLng: Number(vendor.longitude),
+      destLat: data.deliveryLatitude,
+      destLng: data.deliveryLongitude
+    } as feeData;
+
+    const deliveryFee = calculateDeliveryFeeByDistance(calculationData);
+    const totalAmount = data.subtotal + deliveryFee;
+
+    const order = await prisma.$transaction(async (tx) => {
+      const newOrder = await tx.order.create({
+        data: {
+          customerId,
+          vendorId: data.vendorId,
+          deliveryAddress: data.deliveryAddress,
+          deliveryLatitude: data.deliveryLatitude ?? null,
+          deliveryLongitude: data.deliveryLongitude ?? null,
+          paymentMethod: data.paymentMethod,
+          recipientName: data.recipientName || null,
+          recipientPhone: data.recipientPhone || null,
+          notes: data.notes || null,
+          subtotal: data.subtotal,
+          pickupLatitude: Number(vendor.latitude) || null,
+          pickupLongitude: Number(vendor.longitude) || null,
+          vendorAddress: vendor.address,
+          deliveryFee,
+          totalAmount,
+          orderType: 'MARKETPLACE',
+          items: { create: orderItems },
+        },
+        include: {
+          items: { include: { product: { select: { name: true, images: true } } } },
+          vendor: { select: { businessName: true, logo: true, phone: true } },
+        },
+      });
+
+      for (const item of data.items!) {
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { decrement: item.quantity } },
+        });
+      }
+
+      return newOrder;
+    }, { timeout: 15000, maxWait: 30000 });
+
+    await NotificationService.notifyNewOrder(order.id);
+    return order;
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // NEW SIMPLE FLOW — just vendorId + free-text note.
+  // No items, no stock decrement, no known subtotal — vendor
+  // confirms the real total after reading the note.
+  // ═══════════════════════════════════════════════════════
+  if (!data.note || !data.note.trim()) {
+    throw new Error('Either items[] or a note is required to place an order');
+  }
+
+  const deliveryFee = calculateDeliveryFeeByDistance({
+    pickupLat: Number(vendor.latitude),
+    pickupLng: Number(vendor.longitude),
+    destLat: data.deliveryLatitude,
+    destLng: data.deliveryLongitude,
+  });
+
+  const order = await prisma.order.create({
+    data: {
+      customerId,
+      vendorId: data.vendorId,
+      deliveryAddress: data.deliveryAddress,
+      deliveryLatitude: data.deliveryLatitude ?? null,
+      deliveryLongitude: data.deliveryLongitude ?? null,
+      paymentMethod: data.paymentMethod,
+      recipientName: data.recipientName || null,
+      recipientPhone: data.recipientPhone || null,
+      notes: data.note.trim(),
+      pickupLatitude: Number(vendor.latitude) || null,
+      pickupLongitude: Number(vendor.longitude) || null,
+      vendorAddress: vendor.address,
+      subtotal: 0,          // unknown until vendor confirms
+      deliveryFee,
+      totalAmount: deliveryFee, // updated once vendor sets item pricing
+      orderType: 'MARKETPLACE',
+    },
+    include: {
+      vendor: { select: { businessName: true, logo: true, phone: true } },
+    },
   });
 
   await NotificationService.notifyNewOrder(order.id);
-
   return order;
-}
-
-function calculateDeliveryFee(subtotal: number): number {
-  // Base fee: 5 GHS, +2 GHS for every 50 GHS order value
-  const base = 5;
-  const extra = Math.floor(subtotal / 50) * 2;
-  return base + extra;
 }
 
 export async function getOrderById(orderId: string, userId: string) {

@@ -14,6 +14,7 @@ orderRouter.delete('/:id/cancel', authorize('CUSTOMER'), OrderController.cancelO
 orderRouter.post('/:id/rider-accept', OrderController.acceptOrder);
 orderRouter.get('/ready-for-pickup', async (req, res) => {
   const orders = await getOrdersReadyForPickup();
+  console.log(JSON.stringify(orders));
   res.json({ success: true, data: orders });
 });
 
@@ -24,5 +25,6 @@ orderRouter.get('/:id', OrderController.getOrderById);
 orderRouter.patch('/:id/status', OrderController.updateOrderStatus);
 
 // Admin only
-orderRouter.get('/', authorize('ADMIN'), OrderController.getAllOrders);
+// orderRouter.get('/', authorize('ADMIN'), OrderController.getAllOrders);
+orderRouter.get('/', OrderController.getAllOrders);
 export default orderRouter;

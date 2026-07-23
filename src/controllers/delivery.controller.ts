@@ -90,6 +90,7 @@ export async function getDeliveryById(req: AuthRequest, res: Response) {
 export async function getPendingDeliveries(req: Request, res: Response) {
   try {
     const deliveries = await DeliveryService.getPendingDeliveries();
+    console.log(JSON.stringify(deliveries));
     res.status(200).json({ success: true, data: deliveries });
   } catch (err: any) {
     res.status(400).json({ success: false, message: err.message });

@@ -5,29 +5,34 @@ import { AuthRequest } from '../interface/auth-request.interface.ts';
 
 export async function placeOrder(req: AuthRequest, res: Response) {
   try {
-    const { vendorId, items, deliveryAddress, paymentMethod, notes } = req.body;
+    const { vendorId, items, note, deliveryAddress, paymentMethod, recipientName, recipientPhone } = req.body;
 
-    if (!vendorId || !items || !Array.isArray(items) || items.length === 0) {
-      res.status(400).json({
-        success: false,
-        message: 'vendorId and at least one item are required',
-      });
+    if (!vendorId) {
+      res.status(400).json({ success: false, message: 'vendorId is required' });
+      return;
+    }
+
+    const hasItems = Array.isArray(items) && items.length > 0;
+    const hasNote = typeof note === 'string' && note.trim().length > 0;
+
+    if (!hasItems && !hasNote) {
+      res.status(400).json({ success: false, message: 'Either items[] or a note is required' });
       return;
     }
 
     if (!deliveryAddress) {
-      res.status(400).json({
-        success: false,
-        message: 'deliveryAddress is required',
-      });
+      res.status(400).json({ success: false, message: 'deliveryAddress is required' });
       return;
     }
 
     if (!paymentMethod || !['CASH', 'MOMO'].includes(paymentMethod)) {
-      res.status(400).json({
-        success: false,
-        message: 'paymentMethod must be CASH or MOMO',
-      });
+      res.status(400).json({ success: false, message: 'paymentMethod must be CASH or MOMO' });
+      return;
+    }
+
+    // ordering for someone else — both fields become mandatory together
+    if ((recipientName && !recipientPhone) || (recipientPhone && !recipientName)) {
+      res.status(400).json({ success: false, message: 'recipientName and recipientPhone must be provided together' });
       return;
     }
 
@@ -87,6 +92,7 @@ export async function getAllOrders(req: Request, res: Response) {
       page: page ? parseInt(page as string) : 1,
       limit: limit ? parseInt(limit as string) : 20,
     });
+    console.log(`All orders: ${result}`)
     res.status(200).json({ success: true, data: result });
   } catch (err: any) {
     res.status(400).json({ success: false, message: err.message });
