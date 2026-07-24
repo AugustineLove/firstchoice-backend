@@ -41,6 +41,7 @@ exports.getDeliveryById = getDeliveryById;
 exports.getPendingDeliveries = getPendingDeliveries;
 exports.getMyRiderJobs = getMyRiderJobs;
 exports.getAllDeliveries = getAllDeliveries;
+exports.getRiderJobs = getRiderJobs;
 const DeliveryService = __importStar(require("../services/delivery.service"));
 async function assignRider(req, res) {
     try {
@@ -58,7 +59,7 @@ async function assignRider(req, res) {
 }
 async function createDelivery(req, res) {
     try {
-        const { pickupAddress, destinationAddress, itemDescription, paymentMethod } = req.body;
+        const { pickupAddress, destinationAddress, itemDescription, paymentMethod, recipientName, recipientPhone, imageUrl, } = req.body;
         if (!pickupAddress || !destinationAddress || !itemDescription) {
             res.status(400).json({
                 success: false,
@@ -68,6 +69,12 @@ async function createDelivery(req, res) {
         }
         if (!paymentMethod || !['CASH', 'MOMO'].includes(paymentMethod)) {
             res.status(400).json({ success: false, message: 'paymentMethod must be CASH or MOMO' });
+            return;
+        }
+        // recipientName/recipientPhone are optional individually, but if either is
+        // provided (i.e. "delivering for someone else" was used) both are required.
+        if ((recipientName && !recipientPhone) || (recipientPhone && !recipientName)) {
+            res.status(400).json({ success: false, message: 'Both recipient name and phone are required together' });
             return;
         }
         const delivery = await DeliveryService.createDeliveryRequest(req.user.id, req.body);
@@ -115,6 +122,7 @@ async function getDeliveryById(req, res) {
 async function getPendingDeliveries(req, res) {
     try {
         const deliveries = await DeliveryService.getPendingDeliveries();
+        console.log(JSON.stringify(deliveries));
         res.status(200).json({ success: true, data: deliveries });
     }
     catch (err) {
@@ -139,6 +147,15 @@ async function getAllDeliveries(req, res) {
             limit: limit ? parseInt(limit) : 20,
         });
         res.status(200).json({ success: true, data: result });
+    }
+    catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+}
+async function getRiderJobs(req, res) {
+    try {
+        const jobs = await DeliveryService.getRiderJobs(req.user.id);
+        res.status(200).json({ success: true, data: jobs });
     }
     catch (err) {
         res.status(400).json({ success: false, message: err.message });

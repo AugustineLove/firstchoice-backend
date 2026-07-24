@@ -1,0 +1,12 @@
+import * as admin from 'firebase-admin';
+declare const app: admin.app.App;
+export default app;
+export declare function notifyNewOrder(orderId: string): Promise<void>;
+export declare function notifyOrderStatusChange(orderId: string, newStatus: string): Promise<void>;
+export declare function notifyNewDelivery(deliveryId: string): Promise<void>;
+export declare function notifyDeliveryStatusChange(deliveryId: string, newStatus: string): Promise<void>;
+export declare function notifyVendorApproved(vendorUserId: string, businessName: string): Promise<void>;
+export declare function notifyVendorPendingApproval(businessName: string): Promise<void>;
+export declare function notifyNewErrand(errandId: string): Promise<void>;
+export declare function notifyErrandStatusChange(errandId: string, newStatus: string, customerId: string): Promise<void>;
+export declare function updateFcmToken(userId: string, token: string): Promise<void>;

@@ -5,3 +5,5 @@ export declare function getOrderById(req: AuthRequest, res: Response): Promise<v
 export declare function updateOrderStatus(req: AuthRequest, res: Response): Promise<void>;
 export declare function cancelOrder(req: AuthRequest, res: Response): Promise<void>;
 export declare function getAllOrders(req: Request, res: Response): Promise<void>;
+export declare function acceptOrder(req: AuthRequest, res: Response): Promise<void>;
+export declare function uploadOrderImage(req: AuthRequest, res: Response): Promise<void>;

@@ -81,11 +81,13 @@ async function updateProduct(userId, productId, data) {
     if (!vendor)
         throw new Error('Vendor profile not found');
     const product = await prisma_1.prisma.product.findUnique({ where: { id: productId } });
+    console.log(`Product: ${product}`);
     if (!product)
         throw new Error('Product not found');
     if (product.vendorId !== vendor.id)
         throw new Error('You do not own this product');
     const { variantGroups, addonGroups, attributes, ...core } = data;
+    // Increase transaction timeout to 15 seconds
     return prisma_1.prisma.$transaction(async (tx) => {
         // Update core fields
         const updated = await tx.product.update({
@@ -99,16 +101,16 @@ async function updateProduct(userId, productId, data) {
                 await tx.productVariantGroup.createMany({
                     data: variantGroups.map(g => ({ productId, name: g.name, required: g.required ?? true })),
                 });
-                // Re-fetch groups to get their IDs then create variants
+                // Get created groups and create variants in parallel
                 const groups = await tx.productVariantGroup.findMany({ where: { productId } });
-                for (const g of variantGroups) {
+                await Promise.all(variantGroups.map(async (g) => {
                     const group = groups.find(gr => gr.name === g.name);
-                    if (group) {
+                    if (group && g.variants.length) {
                         await tx.productVariant.createMany({
                             data: g.variants.map(v => ({ ...v, groupId: group.id })),
                         });
                     }
-                }
+                }));
             }
         }
         // Replace addon groups if provided
@@ -116,17 +118,27 @@ async function updateProduct(userId, productId, data) {
             await tx.productAddonGroup.deleteMany({ where: { productId } });
             if (addonGroups.length) {
                 await tx.productAddonGroup.createMany({
-                    data: addonGroups.map(g => ({ productId, name: g.name, minSelect: g.minSelect ?? 0, maxSelect: g.maxSelect ?? 10 })),
+                    data: addonGroups.map(g => ({
+                        productId,
+                        name: g.name,
+                        minSelect: g.minSelect ?? 0,
+                        maxSelect: g.maxSelect ?? 10,
+                        incrementable: Boolean(g.incrementable),
+                        incrementMode: g.incrementable
+                            ? (g.incrementMode ?? 'multiple')
+                            : null,
+                    })),
                 });
+                // Get created groups and create addons in parallel
                 const groups = await tx.productAddonGroup.findMany({ where: { productId } });
-                for (const g of addonGroups) {
+                await Promise.all(addonGroups.map(async (g) => {
                     const group = groups.find(gr => gr.name === g.name);
-                    if (group) {
+                    if (group && g.addons.length) {
                         await tx.productAddon.createMany({
                             data: g.addons.map(a => ({ ...a, groupId: group.id })),
                         });
                     }
-                }
+                }));
             }
         }
         // Replace attributes if provided
@@ -138,7 +150,13 @@ async function updateProduct(userId, productId, data) {
                 });
             }
         }
-        return tx.product.findUnique({ where: { id: productId }, include: fullProductInclude });
+        return tx.product.findUnique({
+            where: { id: productId },
+            include: fullProductInclude
+        });
+    }, {
+        timeout: 15000, // Increase timeout to 15 seconds
+        maxWait: 20000, // Maximum time to wait for transaction to acquire lock
     });
 }
 // ─── DELETE ──────────────────────────────────────────────

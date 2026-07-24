@@ -34,8 +34,16 @@ export declare function getTransactionByOrder(orderId: string, userId: string): 
         paymentMethod: import("@prisma/client").$Enums.PaymentMethod;
         paymentStatus: import("@prisma/client").$Enums.PaymentStatus;
         orderStatus: import("@prisma/client").$Enums.OrderStatus;
+        recipientName: string | null;
+        recipientPhone: string | null;
         deliveryAddress: string;
+        imageUrl: string | null;
+        vendorAddress: string | null;
         notes: string | null;
+        deliveryLatitude: number | null;
+        deliveryLongitude: number | null;
+        pickupLatitude: number | null;
+        pickupLongitude: number | null;
     };
 } & {
     id: string;
@@ -74,8 +82,16 @@ export declare function getAllTransactions(filters: {
             paymentMethod: import("@prisma/client").$Enums.PaymentMethod;
             paymentStatus: import("@prisma/client").$Enums.PaymentStatus;
             orderStatus: import("@prisma/client").$Enums.OrderStatus;
+            recipientName: string | null;
+            recipientPhone: string | null;
             deliveryAddress: string;
+            imageUrl: string | null;
+            vendorAddress: string | null;
             notes: string | null;
+            deliveryLatitude: number | null;
+            deliveryLongitude: number | null;
+            pickupLatitude: number | null;
+            pickupLongitude: number | null;
         };
     } & {
         id: string;

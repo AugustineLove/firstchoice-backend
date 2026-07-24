@@ -37,8 +37,11 @@ exports.register = register;
 exports.login = login;
 exports.refresh = refresh;
 exports.me = me;
+exports.resetPassword = resetPassword;
+exports.resetPasswordEmail = resetPasswordEmail;
 const AuthService = __importStar(require("../services/auth.service"));
 const auth_validator_1 = require("../validators/auth.validator");
+const prisma_1 = require("../config/prisma");
 async function register(req, res) {
     console.log(req.body);
     const error = (0, auth_validator_1.validateRegister)(req.body);
@@ -84,6 +87,80 @@ async function refresh(req, res) {
     }
 }
 async function me(req, res) {
-    res.status(200).json({ success: true, data: { user: req.user } });
+    try {
+        const rawUser = await prisma_1.prisma.user.findUnique({
+            where: { id: req.user.id },
+            select: { id: true, name: true, phone: true, email: true, role: true, status: true, profileImage: true },
+        });
+        if (!rawUser) {
+            res.status(404).json({ success: false, message: 'User not found' });
+            return;
+        }
+        const vendor = await prisma_1.prisma.vendor.findUnique({
+            where: { userId: rawUser.id },
+            select: { id: true },
+        });
+        res.status(200).json({
+            success: true,
+            data: {
+                user: {
+                    ...rawUser,
+                    hasVendorProfile: vendor !== null, // ← actual DB check
+                },
+            },
+        });
+    }
+    catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
 }
+async function resetPassword(req, res) {
+    // const error = validateResetPassword(req.body.phone);
+    // console.log(`Error: ${error}`)
+    // if (error) { res.status(400).json({ success: false, message: error }); return; }
+    try {
+        await AuthService.resetPassword(req.body.token, req.body.password);
+        res.status(200).json({ success: true, message: 'Password reset successfully' });
+    }
+    catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+}
+async function resetPasswordEmail(req, res) {
+    const error = (0, auth_validator_1.validateResetPassword)(req.body);
+    console.log(`Error: ${error}`);
+    if (error) {
+        res.status(400).json({ success: false, message: error });
+        return;
+    }
+    try {
+        await AuthService.resetPasswordEmail(req.body.phone);
+        res.status(200).json({ success: true, message: 'Password reset successfully' });
+    }
+    catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+}
+// export async function forgotPassword(req: Request, res: Response) {
+//   if (!req.body.phone) { res.status(400).json({ success: false, message: 'Phone number is required' }); return; }
+//   try {
+//     const result = await AuthService.requestPasswordReset(req.body.phone);
+//     res.status(200).json({ success: true, data: result });
+//   } catch (err: any) {
+//     res.status(400).json({ success: false, message: err.message });
+//   }
+// }
+// export async function syncResetPassword(req: Request, res: Response) {
+//   const { idToken, newPassword } = req.body;
+//   if (!idToken || !newPassword || newPassword.length < 6) {
+//     res.status(400).json({ success: false, message: 'Invalid request' });
+//     return;
+//   }
+//   try {
+//     await AuthService.syncResetPassword(idToken, newPassword);
+//     res.status(200).json({ success: true, message: 'Password synced' });
+//   } catch (err: any) {
+//     res.status(400).json({ success: false, message: err.message });
+//   }
+// }
 //# sourceMappingURL=auth.controller.js.map

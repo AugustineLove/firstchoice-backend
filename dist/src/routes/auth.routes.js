@@ -37,9 +37,13 @@ const express_1 = require("express");
 const AuthController = __importStar(require("../controllers/auth.controller"));
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const authRoutes = (0, express_1.Router)();
+authRoutes.post('/reset-password', AuthController.resetPassword);
+authRoutes.post('/reset-password-email', AuthController.resetPasswordEmail);
 authRoutes.post('/register', AuthController.register);
 authRoutes.post('/login', AuthController.login);
 authRoutes.post('/refresh', AuthController.refresh);
 authRoutes.get('/me', auth_middleware_1.authenticate, AuthController.me);
+// authRoutes.post('/forgot-password', AuthController.forgotPassword);
+// authRoutes.post('/sync-reset-password', AuthController.syncResetPassword);
 exports.default = authRoutes;
 //# sourceMappingURL=auth.routes.js.map

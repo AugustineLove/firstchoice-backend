@@ -37,12 +37,19 @@ exports.getOverviewStats = getOverviewStats;
 exports.getAllUsers = getAllUsers;
 exports.updateUserStatus = updateUserStatus;
 exports.getAllVendors = getAllVendors;
+exports.updateVendorProfile = updateVendorProfile;
 exports.updateVendorStatus = updateVendorStatus;
+exports.addVendorProduct = addVendorProduct;
+exports.deleteVendorProduct = deleteVendorProduct;
 exports.getAllRiders = getAllRiders;
+exports.createVendor = createVendor;
 exports.assignRiderToOrder = assignRiderToOrder;
 exports.getOrderAnalytics = getOrderAnalytics;
 exports.getRiderAnalytics = getRiderAnalytics;
 const AdminService = __importStar(require("../services/admin.service"));
+function handleError(res, err) {
+    res.status(400).json({ success: false, message: err.message || 'Something went wrong' });
+}
 async function getOverviewStats(req, res) {
     try {
         const stats = await AdminService.getOverviewStats();
@@ -99,6 +106,15 @@ async function getAllVendors(req, res) {
         res.status(400).json({ success: false, message: err.message });
     }
 }
+async function updateVendorProfile(req, res) {
+    try {
+        const data = await AdminService.updateVendorProfile(req.params.vendorId, req.body);
+        res.json({ success: true, data });
+    }
+    catch (err) {
+        handleError(res, err);
+    }
+}
 async function updateVendorStatus(req, res) {
     try {
         const { status } = req.body;
@@ -116,6 +132,24 @@ async function updateVendorStatus(req, res) {
         res.status(400).json({ success: false, message: err.message });
     }
 }
+async function addVendorProduct(req, res) {
+    try {
+        const data = await AdminService.createProductForVendor(req.params.vendorId, req.body);
+        res.status(201).json({ success: true, data });
+    }
+    catch (err) {
+        handleError(res, err);
+    }
+}
+async function deleteVendorProduct(req, res) {
+    try {
+        const data = await AdminService.deleteProductAdmin(req.params.productId);
+        res.json({ success: true, data });
+    }
+    catch (err) {
+        handleError(res, err);
+    }
+}
 async function getAllRiders(req, res) {
     try {
         const { availability, page, limit } = req.query;
@@ -128,6 +162,15 @@ async function getAllRiders(req, res) {
     }
     catch (err) {
         res.status(400).json({ success: false, message: err.message });
+    }
+}
+async function createVendor(req, res) {
+    try {
+        const { vendor, tempPassword } = await AdminService.createVendorWithOwner(req.body);
+        res.status(201).json({ success: true, data: vendor, tempPassword });
+    }
+    catch (err) {
+        handleError(res, err);
     }
 }
 async function assignRiderToOrder(req, res) {

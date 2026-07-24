@@ -4,3 +4,5 @@ export declare function register(req: Request, res: Response): Promise<void>;
 export declare function login(req: Request, res: Response): Promise<void>;
 export declare function refresh(req: Request, res: Response): Promise<void>;
 export declare function me(req: AuthRequest, res: Response): Promise<void>;
+export declare function resetPassword(req: Request, res: Response): Promise<void>;
+export declare function resetPasswordEmail(req: Request, res: Response): Promise<void>;

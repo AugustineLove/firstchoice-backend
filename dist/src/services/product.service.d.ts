@@ -16,6 +16,8 @@ interface AddonGroupInput {
         price?: number;
         available?: boolean;
     }[];
+    incrementable?: boolean;
+    incrementMode?: string;
 }
 interface AttributeInput {
     key: string;
@@ -75,6 +77,8 @@ export declare function createProduct(userId: string, data: CreateProductInput):
             id: string;
             price: number;
             available: boolean;
+            incrementable: boolean;
+            incrementMode: string | null;
             groupId: string;
         }[];
     } & {
@@ -83,6 +87,8 @@ export declare function createProduct(userId: string, data: CreateProductInput):
         productId: string;
         minSelect: number;
         maxSelect: number;
+        incrementable: boolean;
+        incrementMode: string | null;
     })[];
     attributes: {
         id: string;
@@ -145,6 +151,8 @@ export declare function updateProduct(userId: string, productId: string, data: P
             id: string;
             price: number;
             available: boolean;
+            incrementable: boolean;
+            incrementMode: string | null;
             groupId: string;
         }[];
     } & {
@@ -153,6 +161,8 @@ export declare function updateProduct(userId: string, productId: string, data: P
         productId: string;
         minSelect: number;
         maxSelect: number;
+        incrementable: boolean;
+        incrementMode: string | null;
     })[];
     attributes: {
         id: string;
@@ -218,6 +228,8 @@ export declare function getProductById(productId: string): Promise<{
             id: string;
             price: number;
             available: boolean;
+            incrementable: boolean;
+            incrementMode: string | null;
             groupId: string;
         }[];
     } & {
@@ -226,6 +238,8 @@ export declare function getProductById(productId: string): Promise<{
         productId: string;
         minSelect: number;
         maxSelect: number;
+        incrementable: boolean;
+        incrementMode: string | null;
     })[];
     attributes: {
         id: string;
@@ -288,6 +302,8 @@ export declare function getProductsByVendor(vendorId: string): Promise<({
             id: string;
             price: number;
             available: boolean;
+            incrementable: boolean;
+            incrementMode: string | null;
             groupId: string;
         }[];
     } & {
@@ -296,6 +312,8 @@ export declare function getProductsByVendor(vendorId: string): Promise<({
         productId: string;
         minSelect: number;
         maxSelect: number;
+        incrementable: boolean;
+        incrementMode: string | null;
     })[];
     attributes: {
         id: string;
@@ -358,6 +376,8 @@ export declare function getMyProducts(userId: string): Promise<({
             id: string;
             price: number;
             available: boolean;
+            incrementable: boolean;
+            incrementMode: string | null;
             groupId: string;
         }[];
     } & {
@@ -366,6 +386,8 @@ export declare function getMyProducts(userId: string): Promise<({
         productId: string;
         minSelect: number;
         maxSelect: number;
+        incrementable: boolean;
+        incrementMode: string | null;
     })[];
     attributes: {
         id: string;
@@ -428,6 +450,8 @@ export declare function searchProducts(query: string, category?: string): Promis
             id: string;
             price: number;
             available: boolean;
+            incrementable: boolean;
+            incrementMode: string | null;
             groupId: string;
         }[];
     } & {
@@ -436,6 +460,8 @@ export declare function searchProducts(query: string, category?: string): Promis
         productId: string;
         minSelect: number;
         maxSelect: number;
+        incrementable: boolean;
+        incrementMode: string | null;
     })[];
     attributes: {
         id: string;
@@ -475,6 +501,8 @@ export declare function addAddonGroup(userId: string, productId: string, data: A
         id: string;
         price: number;
         available: boolean;
+        incrementable: boolean;
+        incrementMode: string | null;
         groupId: string;
     }[];
 } & {
@@ -483,6 +511,8 @@ export declare function addAddonGroup(userId: string, productId: string, data: A
     productId: string;
     minSelect: number;
     maxSelect: number;
+    incrementable: boolean;
+    incrementMode: string | null;
 }>;
 export declare function deleteAddonGroup(userId: string, groupId: string): Promise<{
     message: string;

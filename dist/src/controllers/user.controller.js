@@ -32,14 +32,19 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getMe = getMe;
 exports.updateProfile = updateProfile;
+exports.uploadAvatar = uploadAvatar;
 exports.changePassword = changePassword;
 exports.getMyOrders = getMyOrders;
 exports.getMyDeliveries = getMyDeliveries;
 exports.getMyErrands = getMyErrands;
 const UserService = __importStar(require("../services/user.service"));
+const cloudinary_1 = __importDefault(require("../config/cloudinary"));
 async function getMe(req, res) {
     try {
         const user = await UserService.getUserById(req.user.id);
@@ -61,6 +66,24 @@ async function updateProfile(req, res) {
     }
     catch (err) {
         res.status(400).json({ success: false, message: err.message });
+    }
+}
+async function uploadAvatar(req, res) {
+    try {
+        const file = req.file;
+        if (!file) {
+            res.status(400).json({ success: false, message: 'No image uploaded' });
+            return;
+        }
+        const uploadResult = await new Promise((resolve, reject) => {
+            const stream = cloudinary_1.default.uploader.upload_stream({ folder: 'firstchoice/avatars', transformation: [{ width: 400, height: 400, crop: 'fill' }] }, (error, result) => (error ? reject(error) : resolve(result)));
+            stream.end(file.buffer);
+        });
+        const user = await UserService.updateProfile(req.user.id, { profileImage: uploadResult.secure_url });
+        res.status(200).json({ success: true, message: 'Avatar updated', data: {} });
+    }
+    catch (err) {
+        res.status(400).json({ success: false, message: err.message || 'Avatar upload failed' });
     }
 }
 async function changePassword(req, res) {

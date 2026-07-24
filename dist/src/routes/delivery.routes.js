@@ -40,13 +40,14 @@ const deliveryRouter = (0, express_1.Router)();
 deliveryRouter.use(auth_middleware_1.authenticate);
 // Customer
 deliveryRouter.post('/', (0, auth_middleware_1.authorize)('CUSTOMER'), DeliveryController.createDelivery);
+deliveryRouter.get('/pending', (0, auth_middleware_1.authorize)('RIDER'), DeliveryController.getPendingDeliveries);
 // Customer, Rider, Admin
 deliveryRouter.get('/:id', DeliveryController.getDeliveryById);
 deliveryRouter.patch('/:id/status', DeliveryController.updateDeliveryStatus);
 // Rider: browse available + self-accept + update status + own jobs
-deliveryRouter.get('/pending', (0, auth_middleware_1.authorize)('RIDER'), DeliveryController.getPendingDeliveries);
 deliveryRouter.post('/:id/accept', (0, auth_middleware_1.authorize)('RIDER'), DeliveryController.acceptDelivery);
 deliveryRouter.get('/me/jobs', (0, auth_middleware_1.authorize)('RIDER'), DeliveryController.getMyRiderJobs);
+deliveryRouter.get('/riders/jobs', auth_middleware_1.authenticate, DeliveryController.getRiderJobs);
 // Admin only
 deliveryRouter.get('/', (0, auth_middleware_1.authorize)('ADMIN'), DeliveryController.getAllDeliveries);
 deliveryRouter.patch('/:id/assign', (0, auth_middleware_1.authorize)('ADMIN'), DeliveryController.assignRider);

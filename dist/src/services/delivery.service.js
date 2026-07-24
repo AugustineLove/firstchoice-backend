@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getDeliveryById = getDeliveryById;
 exports.assignRiderToDelivery = assignRiderToDelivery;
@@ -15,10 +48,10 @@ exports.getPendingDeliveries = getPendingDeliveries;
 exports.getRiderJobs = getRiderJobs;
 const prisma_1 = require("../config/prisma");
 const socket_manager_1 = require("../socket/socket.manager");
+const NotificationService = __importStar(require("./notification.service"));
 const socket_manager_2 = require("../socket/socket.manager");
 function calculateDeliveryEstimate(pickupLat, pickupLng, destLat, destLng) {
     if (pickupLat && pickupLng && destLat && destLng) {
-        // Haversine rough distance → tiered pricing
         const R = 6371;
         const dLat = ((destLat - pickupLat) * Math.PI) / 180;
         const dLng = ((destLng - pickupLng) * Math.PI) / 180;
@@ -29,15 +62,41 @@ function calculateDeliveryEstimate(pickupLat, pickupLng, destLat, destLng) {
         const km = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         if (km <= 1)
             return 5;
-        if (km <= 3)
+        if (km <= 1.5)
+            return 6;
+        if (km <= 2)
+            return 7;
+        if (km <= 2.5)
             return 8;
-        if (km <= 7)
+        if (km <= 3)
+            return 9;
+        if (km <= 3.5)
+            return 10;
+        if (km <= 4)
+            return 11;
+        if (km <= 4.5)
             return 12;
-        if (km <= 15)
+        if (km <= 5)
+            return 13;
+        if (km <= 5.5)
+            return 14;
+        if (km <= 6)
+            return 15;
+        if (km <= 6.5)
+            return 16;
+        if (km <= 7)
+            return 17;
+        if (km <= 7.5)
             return 18;
+        if (km <= 8)
+            return 19;
+        if (km <= 8.5)
+            return 20;
+        if (km <= 9)
+            return 21;
         return 25;
     }
-    return 10; // fallback flat rate
+    return 0;
 }
 async function getDeliveryById(deliveryId, userId) {
     const delivery = await prisma_1.prisma.deliveryRequest.findUnique({
@@ -173,7 +232,7 @@ async function deleteLocation(id) {
 }
 // ─── CREATE ──────────────────────────────────────────────
 async function createDeliveryRequest(customerId, data) {
-    const estimatedFee = 10; // flat rate MVP
+    const estimatedFee = calculateDeliveryEstimate(data.pickupLatitude, data.pickupLongitude, data.destinationLatitude, data.destinationLongitude);
     const delivery = await prisma_1.prisma.deliveryRequest.create({
         data: {
             customerId,
@@ -186,12 +245,14 @@ async function createDeliveryRequest(customerId, data) {
             itemDescription: data.itemDescription.trim(),
             estimatedFee,
             paymentMethod: data.paymentMethod,
+            recipientName: data.recipientName?.trim() || null,
+            recipientPhone: data.recipientPhone?.trim() || null,
+            imageUrl: data.imageUrl || null,
         },
         include: {
             customer: { select: { name: true, phone: true } },
         },
     });
-    // ── Broadcast to ALL online riders immediately ──
     const payload = {
         type: 'NEW_DELIVERY',
         deliveryId: delivery.id,
@@ -200,16 +261,18 @@ async function createDeliveryRequest(customerId, data) {
         itemDescription: delivery.itemDescription,
         estimatedFee: delivery.estimatedFee,
         paymentMethod: delivery.paymentMethod,
+        recipientName: delivery.recipientName,
+        recipientPhone: delivery.recipientPhone,
+        imageUrl: delivery.imageUrl,
         customer: {
             name: delivery.customer.name,
             phone: delivery.customer.phone,
         },
         createdAt: delivery.createdAt,
     };
-    // Emit to all riders in the riders room
     (0, socket_manager_2.notifyRiders)('delivery:new_request', payload);
-    // Also notify admins
     (0, socket_manager_1.notifyAdmins)('admin:new_delivery', payload);
+    await NotificationService.notifyNewDelivery(delivery.id);
     return delivery;
 }
 // ─── RIDER SELF-ACCEPT ────────────────────────────────────
@@ -338,6 +401,7 @@ async function updateDeliveryStatus(deliveryId, userId, newStatus) {
                 data: { availability: 'ONLINE' },
             });
         }
+        await NotificationService.notifyDeliveryStatusChange(deliveryId, newStatus);
         return result;
     });
     // ── Real-time events ──
@@ -356,7 +420,7 @@ async function updateDeliveryStatus(deliveryId, userId, newStatus) {
 }
 // ─── FETCH PENDING (for riders to browse) ────────────────
 async function getPendingDeliveries() {
-    return prisma_1.prisma.deliveryRequest.findMany({
+    const deliveries = await prisma_1.prisma.deliveryRequest.findMany({
         where: {
             status: 'PENDING',
             assignedRiderId: null,
@@ -366,6 +430,7 @@ async function getPendingDeliveries() {
         },
         orderBy: { createdAt: 'desc' },
     });
+    return deliveries;
 }
 // ─── RIDER'S OWN JOBS ────────────────────────────────────
 async function getRiderJobs(riderUserId) {

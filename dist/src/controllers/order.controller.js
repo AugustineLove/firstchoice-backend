@@ -38,29 +38,33 @@ exports.getOrderById = getOrderById;
 exports.updateOrderStatus = updateOrderStatus;
 exports.cancelOrder = cancelOrder;
 exports.getAllOrders = getAllOrders;
+exports.acceptOrder = acceptOrder;
+exports.uploadOrderImage = uploadOrderImage;
 const OrderService = __importStar(require("../services/order.service"));
 async function placeOrder(req, res) {
     try {
-        const { vendorId, items, deliveryAddress, paymentMethod, notes } = req.body;
-        if (!vendorId || !items || !Array.isArray(items) || items.length === 0) {
-            res.status(400).json({
-                success: false,
-                message: 'vendorId and at least one item are required',
-            });
+        const { vendorId, items, note, deliveryAddress, paymentMethod, recipientName, recipientPhone } = req.body;
+        if (!vendorId) {
+            res.status(400).json({ success: false, message: 'vendorId is required' });
+            return;
+        }
+        const hasItems = Array.isArray(items) && items.length > 0;
+        const hasNote = typeof note === 'string' && note.trim().length > 0;
+        if (!hasItems && !hasNote) {
+            res.status(400).json({ success: false, message: 'Either items[] or a note is required' });
             return;
         }
         if (!deliveryAddress) {
-            res.status(400).json({
-                success: false,
-                message: 'deliveryAddress is required',
-            });
+            res.status(400).json({ success: false, message: 'deliveryAddress is required' });
             return;
         }
         if (!paymentMethod || !['CASH', 'MOMO'].includes(paymentMethod)) {
-            res.status(400).json({
-                success: false,
-                message: 'paymentMethod must be CASH or MOMO',
-            });
+            res.status(400).json({ success: false, message: 'paymentMethod must be CASH or MOMO' });
+            return;
+        }
+        // ordering for someone else — both fields become mandatory together
+        if ((recipientName && !recipientPhone) || (recipientPhone && !recipientName)) {
+            res.status(400).json({ success: false, message: 'recipientName and recipientPhone must be provided together' });
             return;
         }
         const order = await OrderService.placeOrder(req.user.id, req.body);
@@ -113,10 +117,35 @@ async function getAllOrders(req, res) {
             page: page ? parseInt(page) : 1,
             limit: limit ? parseInt(limit) : 20,
         });
+        console.log(`All orders: ${JSON.stringify(result)}`);
         res.status(200).json({ success: true, data: result });
     }
     catch (err) {
         res.status(400).json({ success: false, message: err.message });
+    }
+}
+async function acceptOrder(req, res) {
+    try {
+        const delivery = await OrderService.riderAcceptOrder(req.params.id, req.user.id);
+        res.status(200).json({ success: true, data: delivery });
+    }
+    catch (err) {
+        const code = err.message.includes('already') ? 409 : 400;
+        res.status(code).json({ success: false, message: err.message });
+    }
+}
+async function uploadOrderImage(req, res) {
+    try {
+        const file = req.file;
+        if (!file) {
+            res.status(400).json({ success: false, message: 'No image uploaded' });
+            return;
+        }
+        const order = await OrderService.attachOrderImage(req.params.id, req.user.id, file.buffer);
+        res.status(200).json({ success: true, message: 'Image attached', data: { order } });
+    }
+    catch (err) {
+        res.status(400).json({ success: false, message: err.message || 'Image upload failed' });
     }
 }
 //# sourceMappingURL=order.controller.js.map

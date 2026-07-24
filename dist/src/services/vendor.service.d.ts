@@ -17,6 +17,8 @@ export declare function registerVendor(userId: string, data: {
     address: string;
     logo: string | null;
     openingHours: string | null;
+    longitude: string | null;
+    latitude: string | null;
 }>;
 export declare function getVendorProfile(vendorId: string): Promise<{
     user: {
@@ -62,6 +64,8 @@ export declare function getVendorProfile(vendorId: string): Promise<{
     address: string;
     logo: string | null;
     openingHours: string | null;
+    longitude: string | null;
+    latitude: string | null;
 }>;
 export declare function getMyVendorProfile(userId: string): Promise<{
     products: {
@@ -102,6 +106,8 @@ export declare function getMyVendorProfile(userId: string): Promise<{
     address: string;
     logo: string | null;
     openingHours: string | null;
+    longitude: string | null;
+    latitude: string | null;
 }>;
 export declare function updateVendorProfile(userId: string, data: {
     businessName?: string;
@@ -122,6 +128,8 @@ export declare function updateVendorProfile(userId: string, data: {
     address: string;
     logo: string | null;
     openingHours: string | null;
+    longitude: string | null;
+    latitude: string | null;
 }>;
 export declare function getAllVendors(filters: {
     businessType?: string;
@@ -176,8 +184,16 @@ export declare function getVendorOrders(userId: string): Promise<({
     paymentMethod: import("@prisma/client").$Enums.PaymentMethod;
     paymentStatus: import("@prisma/client").$Enums.PaymentStatus;
     orderStatus: import("@prisma/client").$Enums.OrderStatus;
+    recipientName: string | null;
+    recipientPhone: string | null;
     deliveryAddress: string;
+    imageUrl: string | null;
+    vendorAddress: string | null;
     notes: string | null;
+    deliveryLatitude: number | null;
+    deliveryLongitude: number | null;
+    pickupLatitude: number | null;
+    pickupLongitude: number | null;
 })[]>;
 export declare function getVendorStats(userId: string): Promise<{
     totalOrders: number;

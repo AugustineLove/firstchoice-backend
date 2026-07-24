@@ -32,21 +32,45 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const OrderController = __importStar(require("../controllers/order.controller"));
 const auth_middleware_1 = require("../middleware/auth.middleware");
+const order_service_1 = require("../services/order.service");
+const multer_1 = __importDefault(require("multer"));
 const orderRouter = (0, express_1.Router)();
 // All order routes require authentication
 orderRouter.use(auth_middleware_1.authenticate);
 // Customer
 orderRouter.post('/', (0, auth_middleware_1.authorize)('CUSTOMER'), OrderController.placeOrder);
 orderRouter.delete('/:id/cancel', (0, auth_middleware_1.authorize)('CUSTOMER'), OrderController.cancelOrder);
+orderRouter.post('/:id/rider-accept', OrderController.acceptOrder);
+orderRouter.get('/ready-for-pickup', async (req, res) => {
+    const orders = await (0, order_service_1.getOrdersReadyForPickup)();
+    console.log(JSON.stringify);
+    res.json({ success: true, data: orders });
+});
+const upload = (0, multer_1.default)({
+    storage: multer_1.default.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+        if (!file.mimetype.startsWith('image/')) {
+            cb(new Error('Only image files are allowed'));
+            return;
+        }
+        cb(null, true);
+    },
+});
+orderRouter.post('/:id/image', auth_middleware_1.authenticate, upload.single('image'), OrderController.uploadOrderImage);
 // Any authenticated role can view their own order
 orderRouter.get('/:id', OrderController.getOrderById);
-// Status updates — service layer enforces role permissions
+// Status updates
 orderRouter.patch('/:id/status', OrderController.updateOrderStatus);
-// Admin only — view all orders
-orderRouter.get('/', (0, auth_middleware_1.authorize)('ADMIN'), OrderController.getAllOrders);
+// Admin only
+// orderRouter.get('/', authorize('ADMIN'), OrderController.getAllOrders);
+orderRouter.get('/', OrderController.getAllOrders);
 exports.default = orderRouter;
 //# sourceMappingURL=order.routes.js.map

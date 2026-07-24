@@ -42,8 +42,9 @@ exports.getVendorOrders = getVendorOrders;
 exports.getVendorStats = getVendorStats;
 const VendorService = __importStar(require("../services/vendor.service"));
 async function registerVendor(req, res) {
+    console.log(req.user);
     try {
-        const { businessName, businessType, address, phone, logo, openingHours } = req.body;
+        const { businessName, businessType, address, phone, logo, openingHours, longitude, latitude } = req.body;
         if (!businessName || !businessType || !address || !phone) {
             res.status(400).json({
                 success: false,
@@ -108,6 +109,7 @@ async function getVendorOrders(req, res) {
     }
 }
 async function getVendorStats(req, res) {
+    console.log(`Body: ${req.body}`);
     try {
         const stats = await VendorService.getVendorStats(req.user.id);
         res.status(200).json({ success: true, data: stats });

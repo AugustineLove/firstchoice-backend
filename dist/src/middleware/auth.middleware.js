@@ -30,6 +30,7 @@ function authorize(...roles) {
             return;
         }
         if (!roles.includes(req.user.role)) {
+            console.log(req.user.role, roles);
             res.status(403).json({ success: false, message: 'Access denied' });
             return;
         }

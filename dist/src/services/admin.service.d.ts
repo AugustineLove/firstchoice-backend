@@ -95,6 +95,8 @@ export declare function getAllVendorsAdmin(filters: {
         address: string;
         logo: string | null;
         openingHours: string | null;
+        longitude: string | null;
+        latitude: string | null;
     })[];
     pagination: {
         total: number;
@@ -115,6 +117,8 @@ export declare function updateVendorStatus(vendorId: string, status: VendorStatu
     address: string;
     logo: string | null;
     openingHours: string | null;
+    longitude: string | null;
+    latitude: string | null;
 }>;
 export declare function getAllRidersAdmin(filters: {
     availability?: string;
@@ -203,8 +207,16 @@ export declare function assignRiderToOrder(orderId: string, riderId: string): Pr
     paymentMethod: import("@prisma/client").$Enums.PaymentMethod;
     paymentStatus: import("@prisma/client").$Enums.PaymentStatus;
     orderStatus: import("@prisma/client").$Enums.OrderStatus;
+    recipientName: string | null;
+    recipientPhone: string | null;
     deliveryAddress: string;
+    imageUrl: string | null;
+    vendorAddress: string | null;
     notes: string | null;
+    deliveryLatitude: number | null;
+    deliveryLongitude: number | null;
+    pickupLatitude: number | null;
+    pickupLongitude: number | null;
 }>;
 export declare function getOrderAnalytics(): Promise<{
     byStatus: (import("@prisma/client").Prisma.PickEnumerable<import("@prisma/client").Prisma.OrderGroupByOutputType, "orderStatus"[]> & {
@@ -255,4 +267,104 @@ export declare function getRiderAnalytics(): Promise<{
             id: number;
         };
     })[];
+}>;
+export declare function createVendorWithOwner(data: {
+    businessName: string;
+    businessType: string;
+    address: string;
+    phone: string;
+    openingHours?: string;
+    logo?: string;
+    ownerName: string;
+    ownerPhone: string;
+    ownerEmail?: string;
+    password?: string;
+}): Promise<{
+    vendor: {
+        user: {
+            name: string;
+            id: string;
+            phone: string;
+            email: string | null;
+        };
+    } & {
+        id: string;
+        phone: string;
+        status: import("@prisma/client").$Enums.VendorStatus;
+        createdAt: Date;
+        userId: string;
+        rating: number;
+        businessName: string;
+        businessType: string;
+        address: string;
+        logo: string | null;
+        openingHours: string | null;
+        longitude: string | null;
+        latitude: string | null;
+    };
+    tempPassword: string;
+}>;
+export declare function updateVendorProfile(vendorId: string, data: {
+    businessName?: string;
+    businessType?: string;
+    address?: string;
+    phone?: string;
+    openingHours?: string;
+    logo?: string;
+}): Promise<{
+    user: {
+        name: string;
+        phone: string;
+        email: string | null;
+    };
+} & {
+    id: string;
+    phone: string;
+    status: import("@prisma/client").$Enums.VendorStatus;
+    createdAt: Date;
+    userId: string;
+    rating: number;
+    businessName: string;
+    businessType: string;
+    address: string;
+    logo: string | null;
+    openingHours: string | null;
+    longitude: string | null;
+    latitude: string | null;
+}>;
+export declare function createProductForVendor(vendorId: string, data: {
+    name: string;
+    category: string;
+    price: number;
+    stock?: number;
+    images?: string[];
+    available?: boolean;
+}): Promise<{
+    name: string;
+    id: string;
+    createdAt: Date;
+    updatedAt: Date;
+    vendorId: string;
+    description: string | null;
+    price: number;
+    stock: number;
+    images: string[];
+    category: string;
+    available: boolean;
+    preparationTime: number | null;
+    calories: number | null;
+    weight: number | null;
+    volume: number | null;
+    unit: string | null;
+    brand: string | null;
+    expiryInfo: string | null;
+    sku: string | null;
+    sizes: string[];
+    colors: string[];
+    tags: string[];
+    isPopular: boolean;
+    isFeatured: boolean;
+}>;
+export declare function deleteProductAdmin(productId: string): Promise<{
+    message: string;
 }>;

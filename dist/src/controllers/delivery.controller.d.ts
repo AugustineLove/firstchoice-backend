@@ -8,3 +8,4 @@ export declare function getDeliveryById(req: AuthRequest, res: Response): Promis
 export declare function getPendingDeliveries(req: Request, res: Response): Promise<void>;
 export declare function getMyRiderJobs(req: AuthRequest, res: Response): Promise<void>;
 export declare function getAllDeliveries(req: Request, res: Response): Promise<void>;
+export declare function getRiderJobs(req: AuthRequest, res: Response): Promise<void>;

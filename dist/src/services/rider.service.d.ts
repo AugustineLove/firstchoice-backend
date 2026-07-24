@@ -148,8 +148,16 @@ export declare function getRiderActiveJobs(userId: string): Promise<{
         paymentMethod: import("@prisma/client").$Enums.PaymentMethod;
         paymentStatus: import("@prisma/client").$Enums.PaymentStatus;
         orderStatus: import("@prisma/client").$Enums.OrderStatus;
+        recipientName: string | null;
+        recipientPhone: string | null;
         deliveryAddress: string;
+        imageUrl: string | null;
+        vendorAddress: string | null;
         notes: string | null;
+        deliveryLatitude: number | null;
+        deliveryLongitude: number | null;
+        pickupLatitude: number | null;
+        pickupLongitude: number | null;
     })[];
     activeDeliveries: ({
         customer: {
@@ -163,10 +171,13 @@ export declare function getRiderActiveJobs(userId: string): Promise<{
         updatedAt: Date;
         customerId: string;
         paymentMethod: import("@prisma/client").$Enums.PaymentMethod;
-        assignedRiderId: string | null;
-        pickupAddress: string;
+        recipientName: string | null;
+        recipientPhone: string | null;
+        imageUrl: string | null;
         pickupLatitude: number | null;
         pickupLongitude: number | null;
+        assignedRiderId: string | null;
+        pickupAddress: string;
         destinationAddress: string;
         destinationLatitude: number | null;
         destinationLongitude: number | null;
@@ -198,8 +209,16 @@ export declare function getRiderJobHistory(userId: string): Promise<{
         paymentMethod: import("@prisma/client").$Enums.PaymentMethod;
         paymentStatus: import("@prisma/client").$Enums.PaymentStatus;
         orderStatus: import("@prisma/client").$Enums.OrderStatus;
+        recipientName: string | null;
+        recipientPhone: string | null;
         deliveryAddress: string;
+        imageUrl: string | null;
+        vendorAddress: string | null;
         notes: string | null;
+        deliveryLatitude: number | null;
+        deliveryLongitude: number | null;
+        pickupLatitude: number | null;
+        pickupLongitude: number | null;
     })[];
     completedDeliveries: ({
         customer: {
@@ -213,10 +232,13 @@ export declare function getRiderJobHistory(userId: string): Promise<{
         updatedAt: Date;
         customerId: string;
         paymentMethod: import("@prisma/client").$Enums.PaymentMethod;
-        assignedRiderId: string | null;
-        pickupAddress: string;
+        recipientName: string | null;
+        recipientPhone: string | null;
+        imageUrl: string | null;
         pickupLatitude: number | null;
         pickupLongitude: number | null;
+        assignedRiderId: string | null;
+        pickupAddress: string;
         destinationAddress: string;
         destinationLatitude: number | null;
         destinationLongitude: number | null;

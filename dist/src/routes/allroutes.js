@@ -14,6 +14,7 @@ const delivery_routes_1 = __importDefault(require("./delivery.routes"));
 const errand_routes_1 = __importDefault(require("./errand.routes"));
 const transaction_routes_1 = __importDefault(require("./transaction.routes"));
 const admin_routes_1 = __importDefault(require("./admin.routes"));
+const location_routes_1 = __importDefault(require("./location.routes"));
 const allRoutes = (0, express_1.Router)();
 allRoutes.use('/api/auth', auth_routes_1.default);
 allRoutes.use('/api/users', user_routes_1.default);
@@ -25,5 +26,6 @@ allRoutes.use('/api/deliveries', delivery_routes_1.default);
 allRoutes.use('/api/errands', errand_routes_1.default);
 allRoutes.use('/api/transactions', transaction_routes_1.default);
 allRoutes.use('/api/admin', admin_routes_1.default);
+allRoutes.use('/api/locations', location_routes_1.default);
 exports.default = allRoutes;
 //# sourceMappingURL=allroutes.js.map
