@@ -224,7 +224,7 @@ export async function assignRiderToOrder(orderId: string, riderId: string) {
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) throw new Error('Order not found');
   if (order.orderStatus !== 'PENDING')
-    throw new Error('Order must be READY_FOR_PICKUP before assigning a rider');
+    throw new Error('Order must be  before assigning a rider');
 
   const rider = await prisma.rider.findUnique({ where: { id: riderId } });
   if (!rider) throw new Error('Rider not found');
