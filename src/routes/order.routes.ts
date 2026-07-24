@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as OrderController from '../controllers/order.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { getOrdersReadyForPickup, riderAcceptOrder } from '../services/order.service';
+import multer from 'multer';
 
 const orderRouter = Router();
 
@@ -17,6 +18,18 @@ orderRouter.get('/ready-for-pickup', async (req, res) => {
   console.log(JSON.stringify)
   res.json({ success: true, data: orders });
 });
+
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) { cb(new Error('Only image files are allowed')); return; }
+    cb(null, true);
+  },
+});
+
+orderRouter.post('/:id/image', authenticate, upload.single('image'), OrderController.uploadOrderImage);
 
 // Any authenticated role can view their own order
 orderRouter.get('/:id', OrderController.getOrderById);

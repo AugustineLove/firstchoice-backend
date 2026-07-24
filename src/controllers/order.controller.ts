@@ -111,3 +111,17 @@ export async function acceptOrder(req: AuthRequest, res: Response) {
     res.status(code).json({ success: false, message: err.message });
   }
 }
+
+export async function uploadOrderImage(req: AuthRequest, res: Response) {
+  try {
+    const file = (req as any).file;
+    if (!file) {
+      res.status(400).json({ success: false, message: 'No image uploaded' });
+      return;
+    }
+    const order = await OrderService.attachOrderImage(req.params.id as string, req.user!.id, file.buffer);
+    res.status(200).json({ success: true, message: 'Image attached', data: { order } });
+  } catch (err: any) {
+    res.status(400).json({ success: false, message: err.message || 'Image upload failed' });
+  }
+}

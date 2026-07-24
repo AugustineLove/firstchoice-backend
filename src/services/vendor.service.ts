@@ -149,7 +149,7 @@ export async function getVendorStats(userId: string) {
       prisma.order.count({
         where: {
           vendorId: vendor.id,
-          orderStatus: { in: ['PENDING', 'ACCEPTED', 'PREPARING'] },
+          orderStatus: { in: ['PENDING', 'ACCEPTED'] },
         },
       }),
       prisma.product.count({ where: { vendorId: vendor.id } }),

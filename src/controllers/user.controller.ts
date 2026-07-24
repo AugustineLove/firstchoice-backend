@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import * as UserService from '../services/user.service';
 import { AuthRequest } from '../interface/auth-request.interface.ts';
+import cloudinary from '../config/cloudinary';
 
 export async function getMe(req: AuthRequest, res: Response) {
   try {
@@ -22,6 +23,29 @@ export async function updateProfile(req: AuthRequest, res: Response) {
     res.status(200).json({ success: true, data: user });
   } catch (err: any) {
     res.status(400).json({ success: false, message: err.message });
+  }
+}
+
+export async function uploadAvatar(req: AuthRequest, res: Response) {
+  try {
+    const file = (req as any).file;
+    if (!file) {
+      res.status(400).json({ success: false, message: 'No image uploaded' });
+      return;
+    }
+
+    const uploadResult: any = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        { folder: 'firstchoice/avatars', transformation: [{ width: 400, height: 400, crop: 'fill' }] },
+        (error, result) => (error ? reject(error) : resolve(result))
+      );
+      stream.end(file.buffer);
+    });
+
+    const user = await UserService.updateProfile(req.user!.id, { profileImage: uploadResult.secure_url });
+    res.status(200).json({ success: true, message: 'Avatar updated', data: { } });
+  } catch (err: any) {
+    res.status(400).json({ success: false, message: err.message || 'Avatar upload failed' });
   }
 }
 

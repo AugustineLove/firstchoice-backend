@@ -23,7 +23,10 @@ export async function assignRider(req: Request, res: Response) {
 
 export async function createDelivery(req: AuthRequest, res: Response) {
   try {
-    const { pickupAddress, destinationAddress, itemDescription, paymentMethod } = req.body;
+    const {
+      pickupAddress, destinationAddress, itemDescription, paymentMethod,
+      recipientName, recipientPhone, imageUrl,
+    } = req.body;
 
     if (!pickupAddress || !destinationAddress || !itemDescription) {
       res.status(400).json({
@@ -35,6 +38,13 @@ export async function createDelivery(req: AuthRequest, res: Response) {
 
     if (!paymentMethod || !['CASH', 'MOMO'].includes(paymentMethod)) {
       res.status(400).json({ success: false, message: 'paymentMethod must be CASH or MOMO' });
+      return;
+    }
+
+    // recipientName/recipientPhone are optional individually, but if either is
+    // provided (i.e. "delivering for someone else" was used) both are required.
+    if ((recipientName && !recipientPhone) || (recipientPhone && !recipientName)) {
+      res.status(400).json({ success: false, message: 'Both recipient name and phone are required together' });
       return;
     }
 

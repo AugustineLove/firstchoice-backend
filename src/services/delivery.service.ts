@@ -224,7 +224,6 @@ export async function deleteLocation(id: string) {
 }
 
 // ─── CREATE ──────────────────────────────────────────────
-
 export async function createDeliveryRequest(
   customerId: string,
   data: {
@@ -236,31 +235,36 @@ export async function createDeliveryRequest(
     destinationLongitude?: number;
     itemDescription: string;
     paymentMethod: 'CASH' | 'MOMO';
+    recipientName?: string;
+    recipientPhone?: string;
+    imageUrl?: string;
   }
 ) {
   const estimatedFee = calculateDeliveryEstimate(
     data.pickupLatitude, data.pickupLongitude, data.destinationLatitude, data.destinationLongitude
-  )
+  );
 
   const delivery = await prisma.deliveryRequest.create({
     data: {
       customerId,
-      pickupAddress:       data.pickupAddress.trim(),
-      pickupLatitude:      data.pickupLatitude,
-      pickupLongitude:     data.pickupLongitude,
-      destinationAddress:  data.destinationAddress.trim(),
-      destinationLatitude: data.destinationLatitude,
-      destinationLongitude:data.destinationLongitude,
-      itemDescription:     data.itemDescription.trim(),
+      pickupAddress:        data.pickupAddress.trim(),
+      pickupLatitude:       data.pickupLatitude,
+      pickupLongitude:      data.pickupLongitude,
+      destinationAddress:   data.destinationAddress.trim(),
+      destinationLatitude:  data.destinationLatitude,
+      destinationLongitude: data.destinationLongitude,
+      itemDescription:      data.itemDescription.trim(),
       estimatedFee,
-      paymentMethod:       data.paymentMethod,
+      paymentMethod:        data.paymentMethod,
+      recipientName:        data.recipientName?.trim() || null,
+      recipientPhone:       data.recipientPhone?.trim() || null,
+      imageUrl:             data.imageUrl || null,
     },
     include: {
       customer: { select: { name: true, phone: true } },
     },
   });
 
-  // ── Broadcast to ALL online riders immediately ──
   const payload = {
     type:            'NEW_DELIVERY',
     deliveryId:      delivery.id,
@@ -269,6 +273,9 @@ export async function createDeliveryRequest(
     itemDescription: delivery.itemDescription,
     estimatedFee:    delivery.estimatedFee,
     paymentMethod:   delivery.paymentMethod,
+    recipientName:   delivery.recipientName,
+    recipientPhone:  delivery.recipientPhone,
+    imageUrl:        delivery.imageUrl,
     customer: {
       name:  delivery.customer.name,
       phone: delivery.customer.phone,
@@ -276,10 +283,7 @@ export async function createDeliveryRequest(
     createdAt: delivery.createdAt,
   };
 
-  // Emit to all riders in the riders room
   notifyRiders('delivery:new_request', payload);
-
-  // Also notify admins
   notifyAdmins('admin:new_delivery', payload);
   await NotificationService.notifyNewDelivery(delivery.id);
 

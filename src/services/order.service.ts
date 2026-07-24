@@ -8,6 +8,7 @@ import {
   notifyRiders,
 } from '../socket/socket.manager';
 import * as NotificationService from './notification.service';
+import cloudinary from '../config/cloudinary';
 
 interface feeData {
   pickupLat?: number,
@@ -148,7 +149,7 @@ export async function placeOrder(
           deliveryFee,
           totalAmount,
           orderType: 'MARKETPLACE',
-           orderStatus: 'READY_FOR_PICKUP',
+           orderStatus: 'PENDING',
           items: { create: orderItems },
         },
         include: {
@@ -205,7 +206,7 @@ export async function placeOrder(
       deliveryFee,
       totalAmount: deliveryFee, // updated once vendor sets item pricing
       orderType: 'MARKETPLACE',
-       orderStatus: 'READY_FOR_PICKUP',
+       orderStatus: 'PENDING',
     },
     include: {
       vendor: { select: { businessName: true, logo: true, phone: true } },
@@ -264,14 +265,13 @@ export async function getOrderById(orderId: string, userId: string) {
 // Rider: pick up, deliver
 // Customer/Admin: cancel
 const validTransitions: Record<OrderStatus, OrderStatus[]> = {
-  PENDING: [],
-  ACCEPTED: [],
-  PREPARING: [],
-  READY_FOR_PICKUP: ['CANCELLED'],
-  RIDER_ASSIGNED: ['PICKED_UP'],
-  PICKED_UP: ['DELIVERED'],
+  PENDING: ['RIDER_ASSIGNED', 'CANCELLED'],
+  RIDER_ASSIGNED: ['PICKED_UP', 'CANCELLED'],
+  PICKED_UP: ['IN_TRANSIT'],
+  IN_TRANSIT: ['DELIVERED'],
   DELIVERED: [],
   CANCELLED: [],
+  ACCEPTED: [],
 };
 
 export async function updateOrderStatus(
@@ -292,26 +292,60 @@ export async function updateOrderStatus(
   const rider = await prisma.rider.findUnique({ where: { userId } });
 
   // Role-based permission checks
-  if (newStatus === 'ACCEPTED' || newStatus === 'PREPARING' || newStatus === 'READY_FOR_PICKUP') {
-    if (vendor?.id !== order.vendorId)
-      throw new Error('Only the vendor can update to this status');
-  }
+  // if (newStatus === 'ACCEPTED') {
+  //   if (vendor?.id !== order.vendorId)
+  //     throw new Error('Only the vendor can update to this status');
+  // }
 
   if (newStatus === 'PICKED_UP' || newStatus === 'DELIVERED') {
     if (rider?.id !== order.riderId)
       throw new Error('Only the assigned rider can update to this status');
   }
 
-  if (newStatus === 'RIDER_ASSIGNED' && user.role !== 'ADMIN')
-    throw new Error('Only admin can assign riders');
+  // if (newStatus === 'RIDER_ASSIGNED' && user.role !== 'ADMIN')
+  //   throw new Error('Only admin can assign riders');
+
+  if (newStatus === 'RIDER_ASSIGNED') {
+  if (!rider)
+    throw new Error('Only riders can accept orders');
+
+  if (order.riderId)
+    throw new Error('Order has already been assigned');
+
+  await prisma.$transaction(async (tx) => {
+  const current = await tx.order.findUnique({
+    where: { id: orderId },
+  });
+
+  if (!current || current.riderId) {
+    throw new Error('Order already assigned');
+  }
+
+  await tx.order.update({
+    where: { id: orderId },
+    data: {
+      riderId: rider.id,
+      orderStatus: 'RIDER_ASSIGNED',
+    },
+  });
+});
+
+  await emitOrderEvent(orderId, 'RIDER_ASSIGNED');
+  await NotificationService.notifyOrderStatusChange(
+    orderId,
+    'RIDER_ASSIGNED'
+  );
+
+  return;
+}
 
   if (newStatus === 'CANCELLED') {
     const cancellable = ['PENDING', 'ACCEPTED'];
     if (!cancellable.includes(order.orderStatus))
       throw new Error('Order can no longer be cancelled');
   }
-  if (newStatus ==='READY_FOR_PICKUP'){
-    console.log('READY_FOR_PICKUP reached');
+  if (newStatus ==='PENDING'){
+    console.log('PENDING reached');
     console.log({
       type: 'NEW_DELIVERY',
       orderId: order.id,
@@ -477,7 +511,7 @@ async function emitOrderEvent(orderId: string, status: OrderStatus) {
   notifyAdmins('admin:order_update', payload);
 
   // New order — notify all riders
-  if (status === 'READY_FOR_PICKUP') {
+  if (status === 'PENDING') {
     notifyAdmins('admin:order_ready_for_dispatch', {
       orderId,
       vendorId: order.vendorId,
@@ -492,7 +526,7 @@ export async function getOrdersReadyForPickup() {
 
   return prisma.order.findMany({
     where: {
-      orderStatus: 'READY_FOR_PICKUP',
+      orderStatus: 'ACCEPTED',
       riderId: null,
     },
     include: {
@@ -520,7 +554,7 @@ export async function riderAcceptOrder(orderId: string, riderUserId: string) {
   return prisma.$transaction(async (tx) => {
     const order = await tx.order.findUnique({ where: { id: orderId } });
     if (!order) throw new Error('Order not found');
-    if (order.orderStatus !== 'READY_FOR_PICKUP') throw new Error('Order already taken');
+    if (order.orderStatus !== 'PENDING') throw new Error('Order already taken');
     if (order.riderId) throw new Error('Order already assigned');
 
     const updated = await tx.order.update({
@@ -552,3 +586,23 @@ export async function riderAcceptOrder(orderId: string, riderUserId: string) {
   });
   
 }
+
+
+export async function attachOrderImage(orderId: string, customerId: string, imageBuffer: Buffer) {
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order) throw new Error('Order not found');
+  if (order.customerId !== customerId) throw new Error('Not authorized to modify this order');
+
+  const uploadResult: any = await new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder: 'firstchoice/orders', transformation: [{ width: 1000, crop: 'limit' }] },
+      (error, result) => (error ? reject(error) : resolve(result))
+    );
+    stream.end(imageBuffer);
+  });
+
+  return prisma.order.update({
+    where: { id: orderId },
+    data: { imageUrl: uploadResult.secure_url },
+  });
+} 
