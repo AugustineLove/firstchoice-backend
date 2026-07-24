@@ -587,7 +587,6 @@ export async function riderAcceptOrder(orderId: string, riderUserId: string) {
   
 }
 
-
 export async function attachOrderImage(orderId: string, customerId: string, imageBuffer: Buffer) {
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) throw new Error('Order not found');
