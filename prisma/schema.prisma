@@ -37,7 +37,6 @@ enum VendorStatus {
 enum OrderStatus {
   PENDING
   ACCEPTED
-  PREPARING
   RIDER_ASSIGNED
   PICKED_UP
   IN_TRANSIT
@@ -254,6 +253,7 @@ model Order {
   recipientPhone  String?
   deliveryAddress String
 
+  imageUrl        String?
   vendorAddress String?
   notes           String?
   createdAt       DateTime      @default(now())
