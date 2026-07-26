@@ -106,6 +106,8 @@ model User {
 
   firebaseUid String? @unique
 
+  vendorRatings VendorRating[] 
+
 }
 
 model Rider {
@@ -139,7 +141,7 @@ model Vendor {
   status       VendorStatus @default(PENDING)
   rating       Float        @default(0)
   createdAt    DateTime     @default(now())
-
+  ratings      VendorRating[]
   products     Product[]
   orders       Order[]
   longitude    String?
@@ -346,3 +348,17 @@ model Transaction {
   recordedAt    DateTime      @default(now())
 }
 
+model VendorRating {
+  id         String   @id @default(cuid())
+  vendorId   String
+  vendor     Vendor   @relation(fields: [vendorId], references: [id])
+  customerId String
+  customer   User     @relation(fields: [customerId], references: [id])
+  rating     Int      // 1–5, enforced in the service layer
+  comment    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // one vote per customer per vendor — this is what makes "rate once" work
+  @@unique([vendorId, customerId])
+}
