@@ -99,6 +99,7 @@ model User {
   errands      Errand[]
 
   fcmToken   String?
+  webFcmToken  String?
   fcmUpdatedAt DateTime? @updatedAt
 
   resetPasswordToken   String?
