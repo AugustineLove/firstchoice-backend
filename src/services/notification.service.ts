@@ -36,73 +36,43 @@ function cleanString(str: any): string {
     .trim();
 }
 
-async function sendToUser(userId: string, payload: PushPayload): Promise<boolean> {
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { fcmToken: true, name: true },
-    });
+async function sendToUser(userId: string, payload: PushPayload) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { fcmToken: true, webFcmToken: true },
+  });
 
-    console.log(`SendToUser notification user: ${JSON.stringify(user)}`); 
+  const tokens = [user?.fcmToken, user?.webFcmToken].filter(Boolean).map(cleanString);
+  if (!tokens.length) return false;
 
-    const cleanToken = cleanString(user?.fcmToken);
-    if (!cleanToken) return false;
-
-    if (!user?.fcmToken) return false;
-
-    // 1. Clean the payload parts carefully up front
-    const safeTitle = cleanString(payload.title);
-    const safeBody = cleanString(payload.body);
-    
-    const safeData: Record<string, string> = {};
-    if (payload.data) {
-      for (const [key, value] of Object.entries(payload.data)) {
-        safeData[key] = cleanString(value);
-      }
+  const safeTitle = cleanString(payload.title);
+  const safeBody = cleanString(payload.body);
+  const safeData: Record<string, string> = {};
+  if (payload.data) {
+    for (const [k, v] of Object.entries(payload.data)) {
+      safeData[k] = cleanString(v);
     }
-
-    // 2. Safe log logging
-    console.log("CLEANED PAYLOAD:", JSON.stringify({ title: safeTitle, body: safeBody, data: safeData }, null, 2));
-
-    await app.messaging().send({
-      token: cleanToken,
-      notification: {
-        title: safeTitle,
-        body: safeBody,
-        ...(payload.imageUrl && { imageUrl: payload.imageUrl }),
-      },
-      data: safeData,
-      android: {
-        priority: "high",
-        notification: {
-          channelId: "firstchoice_channel",
-          priority: "high",
-          defaultSound: true,
-          defaultVibrateTimings: true,
-        },
-      },
-      apns: {
-        payload: {
-          aps: {
-            sound: "default",
-            badge: 1,
-            contentAvailable: true,
-          },
-        },
-      },
-    });
-
-    return true;
-  } catch (err: any) {
-    if (err.code === 'messaging/registration-token-not-registered') {
-      await prisma.user.update({
-        where: { id: userId },
-        data: { fcmToken: null },
-      }).catch(() => {});
-    }
-    console.error(`Push failed for user ${userId}:`, err?.message || err);
-    return false;
   }
+
+  const results = await Promise.allSettled(tokens.map((token) =>
+    app.messaging().send({
+      token,
+      notification: { title: safeTitle, body: safeBody },
+      data: safeData,
+      android: { priority: 'high', notification: { channelId: 'firstchoice_channel', priority: 'high' } },
+      apns: { payload: { aps: { sound: 'default', badge: 1 } } },
+      webpush: { fcmOptions: { link: safeData.screen ? `/${safeData.screen}` : '/' } },
+    })
+  ));
+
+  results.forEach((r, i) => {
+    if (r.status === 'rejected' && r.reason?.code === 'messaging/registration-token-not-registered') {
+      const field = tokens[i] === user!.fcmToken ? 'fcmToken' : 'webFcmToken';
+      prisma.user.update({ where: { id: userId }, data: { [field]: null } }).catch(() => {});
+    }
+  });
+
+  return results.some((r) => r.status === 'fulfilled');
 }
 
 async function sendToMany(userIds: string[], payload: PushPayload): Promise<void> {

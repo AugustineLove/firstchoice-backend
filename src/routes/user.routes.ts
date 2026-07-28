@@ -4,6 +4,7 @@ import * as UserController from '../controllers/user.controller';
 import { authenticate } from '../middleware/auth.middleware';
 import { updateFcmToken } from '../services/notification.service';
 import { AuthRequest } from '../interface/auth-request.interface.ts';
+import { prisma } from '../config/prisma';
 
 const userRouter = Router();
 const upload = multer({
@@ -43,6 +44,11 @@ userRouter.post('/me/fcm-token', authenticate, async (req: AuthRequest, res) => 
   } catch (err: any) {
     res.status(400).json({ success: false, message: err.message });
   }
+});
+
+userRouter.patch('/users/web-fcm-token', authenticate, async (req: AuthRequest, res) => {
+  await prisma.user.update({ where: { id: req.user!.id }, data: { webFcmToken: req.body.token } });
+  res.json({ success: true });
 });
 
 userRouter.get('/me', UserController.getMe);
