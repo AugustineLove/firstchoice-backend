@@ -55,9 +55,11 @@ export async function getOrderById(req: AuthRequest, res: Response) {
 
 export async function updateOrderStatus(req: AuthRequest, res: Response) {
   try {
+    
     const { status } = req.body;
-
+    console.log(status);
     if (!status) {
+      console.log('not status');
       res.status(400).json({ success: false, message: 'status is required' });
       return;
     }
@@ -69,6 +71,7 @@ export async function updateOrderStatus(req: AuthRequest, res: Response) {
     );
     res.status(200).json({ success: true, data: order });
   } catch (err: any) {
+    console.log(err);
     res.status(400).json({ success: false, message: err.message });
   }
 }

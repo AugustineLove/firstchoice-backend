@@ -46,7 +46,7 @@ userRouter.post('/me/fcm-token', authenticate, async (req: AuthRequest, res) => 
   }
 });
 
-userRouter.patch('/users/web-fcm-token', authenticate, async (req: AuthRequest, res) => {
+userRouter.patch('/web-fcm-token', authenticate, async (req: AuthRequest, res) => {
   await prisma.user.update({ where: { id: req.user!.id }, data: { webFcmToken: req.body.token } });
   res.json({ success: true });
 });
