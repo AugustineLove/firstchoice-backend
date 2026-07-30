@@ -46,16 +46,16 @@ userRouter.post('/me/fcm-token', authenticate, async (req: AuthRequest, res) => 
   }
 });
 
-    userRouter.patch('/web-fcm-token', authenticate, async (req: AuthRequest, res) => {
-      try {
-        if (!req.body.token) { res.status(400).json({ success: false, message: 'token required' }); return; }
-        await prisma.user.update({ where: { id: req.user!.id }, data: { webFcmToken: req.body.token } });
-        res.json({ success: true });
-      } catch (err: any) {
-        console.error('[web-fcm-token] failed:', err.message);
-        res.status(500).json({ success: false, message: err.message });
-      }
-    });
+userRouter.patch('/web-fcm-token', authenticate, async (req: AuthRequest, res) => {
+  try {
+    if (!req.body.token) { res.status(400).json({ success: false, message: 'token required' }); return; }
+    await prisma.user.update({ where: { id: req.user!.id }, data: { webFcmToken: req.body.token } });
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('[web-fcm-token] failed:', err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
 
 userRouter.get('/me', UserController.getMe);
 userRouter.patch('/me', UserController.updateProfile);
