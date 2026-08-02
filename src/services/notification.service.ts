@@ -66,11 +66,16 @@ async function sendToUser(userId: string, payload: PushPayload) {
   ));
 
   results.forEach((r, i) => {
-    if (r.status === 'rejected' && r.reason?.code === 'messaging/registration-token-not-registered') {
+  if (r.status === 'rejected') {
+    console.error(`[push] send failed for user ${userId}, token ${tokens[i]?.slice(0, 12)}...:`, r.reason?.code, r.reason?.message);
+    if (r.reason?.code === 'messaging/registration-token-not-registered') {
       const field = tokens[i] === user!.fcmToken ? 'fcmToken' : 'webFcmToken';
       prisma.user.update({ where: { id: userId }, data: { [field]: null } }).catch(() => {});
     }
-  });
+  } else {
+    console.log(`[push] sent OK to user ${userId}, token ${tokens[i]?.slice(0, 12)}...`);
+  }
+});
 
   return results.some((r) => r.status === 'fulfilled');
 }
