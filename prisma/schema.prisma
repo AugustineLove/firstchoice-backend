@@ -109,6 +109,10 @@ model User {
 
   vendorRatings VendorRating[] 
 
+  telegramChatId         String?
+  telegramLinkCode       String?   @unique
+  telegramLinkCodeExpiry DateTime?
+
 }
 
 model Rider {
