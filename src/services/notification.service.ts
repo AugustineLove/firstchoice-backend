@@ -189,10 +189,11 @@ export async function notifyOrderStatusChange(
   });
 
   // → Vendor gets notified on rider assignment, pickup, delivery, cancel
-  if (['RIDER_ASSIGNED', 'PICKED_UP', 'DELIVERED', 'CANCELLED'].includes(newStatus)) {
+  if (['RIDER_ASSIGNED', 'PICKED_UP', 'IN_TRANSIT', 'DELIVERED', 'CANCELLED'].includes(newStatus)) {
     const vendorMessages: Record<string, { title: string; body: string }> = {
       RIDER_ASSIGNED: { title: '🛵 Rider On The Way', body: `${order.rider?.user.name} is heading to pick up order #${orderId.slice(-6).toUpperCase()}` },
       PICKED_UP:      { title: '✅ Order Picked Up', body: `Order #${orderId.slice(-6).toUpperCase()} has been picked up.` },
+      IN_TRANSIT:      { title: '✅ Order Coming To You', body: `Order #${orderId.slice(-6).toUpperCase()} has been picked up and is on the way to you.` },
       DELIVERED:      { title: '🎉 Order Delivered', body: `Order #${orderId.slice(-6).toUpperCase()} was delivered successfully!` },
       CANCELLED:      { title: '❌ Order Cancelled', body: `Order #${orderId.slice(-6).toUpperCase()} was cancelled.` },
     };
