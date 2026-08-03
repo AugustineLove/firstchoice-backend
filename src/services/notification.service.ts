@@ -2,6 +2,7 @@ import * as admin from 'firebase-admin';
 import { prisma } from '../config/prisma';
 import path from 'path';
 import { notifyRiders } from '../socket/socket.manager';
+// import { sendTelegramToMany } from './telegram.service';
 
 const app =
   admin.apps.length > 0
@@ -126,6 +127,7 @@ export async function notifyNewOrder(orderId: string): Promise<void> {
     data:  { type: 'NEW_ORDER', orderId, screen: 'admin_orders' },
   });
 }
+  
 
     function notifyRidersOfJob(order: {
       id: string;
@@ -163,6 +165,7 @@ export async function notifyOrderStatusChange(
       customer: { select: { id: true, name: true } },
       vendor:   { include: { user: { select: { id: true } } } },
       rider:    { include: { user: { select: { id: true, name: true } } } },
+      items:    { include: { product: { select: { name: true } } } },
     },
   });
   if (!order) return;
@@ -173,6 +176,7 @@ export async function notifyOrderStatusChange(
     READY_FOR_PICKUP: { title: '📦 Ready for Pickup', body: 'Your order is ready and waiting for a rider.' },
     RIDER_ASSIGNED:   { title: '🛵 Rider Assigned', body: `${order.rider?.user.name ?? 'A rider'} is coming to pick up your order!` },
     PICKED_UP:        { title: '🛵 Order Picked Up', body: 'Your order has been picked up and is on the way!' },
+    IN_TRANSIT:      { title: '🛵 Order Coming To You', body: 'Your order is on the way to you.'},
     DELIVERED:        { title: '🎉 Order Delivered!', body: `Your order from ${order.vendor.businessName} has been delivered. Enjoy!` },
     CANCELLED:        { title: '❌ Order Cancelled', body: `Your order from ${order.vendor.businessName} was cancelled.` },
   };
@@ -187,6 +191,19 @@ export async function notifyOrderStatusChange(
     ...msg,
     data: baseData,
   });
+
+  const itemSummary = order.items.slice(0, 2).map(i => i.product.name).join(', ')
+    + (order.items.length > 2 ? ` +${order.items.length - 2} more` : '');
+
+
+  const admins = await prisma.user.findMany({
+    where: { role: 'ADMIN', telegramChatId: { not: null } },
+    select: { telegramChatId: true },
+  });
+  // await sendTelegramToMany(
+  //   admins.map(a => a.telegramChatId!),
+  //   `📦 <b>New Order</b>\nFrom ${order.customer.name} at ${order.vendor.businessName}\nItems: ${itemSummary}\nTotal: GHS ${order.totalAmount.toFixed(2)}\nOrder #${orderId.slice(-6).toUpperCase()}`
+  // );
 
   // → Vendor gets notified on rider assignment, pickup, delivery, cancel
   if (['RIDER_ASSIGNED', 'PICKED_UP', 'IN_TRANSIT', 'DELIVERED', 'CANCELLED'].includes(newStatus)) {
@@ -249,7 +266,7 @@ export async function notifyDeliveryStatusChange(
   const delivery = await prisma.deliveryRequest.findUnique({
     where: { id: deliveryId },
     include: {
-      customer: { select: { id: true } },
+      customer: { select: { id: true, name: true } },
       rider:    { include: { user: { select: { id: true, name: true } } } },
     },
   });
@@ -270,6 +287,28 @@ export async function notifyDeliveryStatusChange(
     ...msg,
     data: { type: 'DELIVERY_STATUS', deliveryId, status: newStatus, screen: 'delivery_detail' },
   });
+
+   const [onlineRiders, admins] = await Promise.all([
+    prisma.rider.findMany({
+      where: { availability: 'ONLINE', user: { telegramChatId: { not: null } } },
+      include: { user: { select: { telegramChatId: true } } },
+    }),
+    prisma.user.findMany({
+      where: { role: 'ADMIN', telegramChatId: { not: null } },
+      select: { telegramChatId: true },
+    }),
+  ]);
+
+  const chatIds = [
+    ...onlineRiders.map(r => r.user.telegramChatId!),
+    ...admins.map(a => a.telegramChatId!),
+  ];
+
+  // await sendTelegramToMany(
+  //   chatIds,
+  //   `🚀 <b>New Delivery Request</b>\nFrom ${delivery.customer.name}\n${delivery.pickupAddress} → ${delivery.destinationAddress}\nFee: GHS ${delivery.estimatedFee.toFixed(2)}\nTap to accept in the app.`
+  // );
+
 }
 
 // ─── VENDOR NOTIFICATIONS ─────────────────────────────────

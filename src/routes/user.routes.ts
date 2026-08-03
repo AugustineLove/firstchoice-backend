@@ -5,6 +5,7 @@ import { authenticate } from '../middleware/auth.middleware';
 import { updateFcmToken } from '../services/notification.service';
 import { AuthRequest } from '../interface/auth-request.interface.ts';
 import { prisma } from '../config/prisma';
+import { generateTelegramLink } from '../services/telegram.service';
 
 const userRouter = Router();
 const upload = multer({
@@ -56,6 +57,26 @@ userRouter.patch('/web-fcm-token', authenticate, async (req: AuthRequest, res) =
     res.status(500).json({ success: false, message: err.message });
   }
 });
+
+userRouter.patch('/me/telegram-chat-id', authenticate, async (req: AuthRequest, res) => {
+  try {
+    if (!req.body.chatId) { res.status(400).json({ success: false, message: 'chatId required' }); return; }
+    await prisma.user.update({ where: { id: req.user!.id }, data: { telegramChatId: String(req.body.chatId) } });
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+userRouter.get('/me/telegram-link', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const link = await generateTelegramLink(req.user!.id);
+    res.json({ success: true, data: { link } });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 
 userRouter.get('/me', UserController.getMe);
 userRouter.patch('/me', UserController.updateProfile);
