@@ -86,7 +86,7 @@ export async function placeOrder(
   if (vendor.status !== 'ACTIVE') throw new Error('This vendor is currently unavailable');
 
   const hasStructuredItems = Array.isArray(data.items) && data.items.length > 0;
-
+console.log(`Sub total: ${data.subtotal}`);
   // ═══════════════════════════════════════════════════════
   // LEGACY FLOW — untouched. Kicks in only when items[] is sent.
   // ═══════════════════════════════════════════════════════
@@ -202,7 +202,7 @@ export async function placeOrder(
       pickupLatitude: Number(vendor.latitude) || null,
       pickupLongitude: Number(vendor.longitude) || null,
       vendorAddress: vendor.businessName,
-      subtotal: 0,          // unknown until vendor confirms
+      subtotal: data.subtotal,          // unknown until vendor confirms
       deliveryFee,
       totalAmount: deliveryFee, // updated once vendor sets item pricing
       orderType: 'MARKETPLACE',
