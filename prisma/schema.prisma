@@ -217,7 +217,8 @@ model ProductAddonGroup {
   minSelect  Int            @default(0)
   maxSelect  Int            @default(10)
   incrementable Boolean   @default(false)
-  incrementMode String?
+  incrementMode String?      // "multiple" | "free" | "halves" | "custom"
+  customIncrementValue Float? // flat GHS amount added per extra unit when incrementMode == "custom"
 
   addons     ProductAddon[]
 }
@@ -230,7 +231,13 @@ model ProductAddon {
   price     Float             @default(0)
   available Boolean           @default(true)
   incrementable Boolean       @default(false)
-  incrementMode String?
+  incrementMode String?       // "multiple" | "free" | "halves" | "custom"
+  // Pricing formulas (qty = quantity selected, base = price above):
+  //   multiple -> base * qty
+  //   free     -> base + (qty - 1) * 1
+  //   halves   -> base + (qty - 1) * (base / 2)
+  //   custom   -> base + (qty - 1) * customIncrementValue
+  customIncrementValue Float? // flat GHS amount added per extra unit when incrementMode == "custom"; always > 0
 }
 
 model ProductAttribute {
