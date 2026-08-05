@@ -70,7 +70,6 @@ export async function getMyVendorProfile(userId: string) {
   if (!vendor) throw new Error('No vendor profile found for this account');
   return vendor;
 }
-
 export async function updateVendorProfile(
   userId: string,
   data: {
@@ -80,10 +79,27 @@ export async function updateVendorProfile(
     phone?: string;
     logo?: string;
     openingHours?: string;
+    latitude?: string;
+    longitude?: string;
   }
 ) {
   const vendor = await prisma.vendor.findUnique({ where: { userId } });
   if (!vendor) throw new Error('Vendor profile not found');
+
+  // Basic sanity check: if provided, latitude/longitude must parse to real
+  // numbers within valid GPS ranges before we persist them.
+  if (data.latitude !== undefined) {
+    const lat = Number(data.latitude);
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+      throw new Error('Invalid latitude value');
+    }
+  }
+  if (data.longitude !== undefined) {
+    const lng = Number(data.longitude);
+    if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
+      throw new Error('Invalid longitude value');
+    }
+  }
 
   return prisma.vendor.update({
     where: { userId },
