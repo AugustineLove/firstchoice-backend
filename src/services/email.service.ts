@@ -35,7 +35,7 @@ export async function sendPasswordResetEmail(to: string, name: string, otp: stri
         <div style="padding: 24px; border: 1px solid #eee; border-top: none; border-radius: 0 0 16px 16px;">
           <p>Hi ${name},</p>
           <p>Use this code to reset your password. It expires in 15 minutes.</p>
-          <div style="font-size: 32px; font-weight: 800; letter-spacing: 6px; text-align:center; padding: 16px; background:#f5f5f5; border-radius: 12px; margin: 16px 0;">
+          <div style="font-size: 17px; font-weight: 800; letter-spacing: 6px; text-align:center; padding: 16px; background:#f5f5f5; border-radius: 12px; margin: 16px 0;">
             ${otp}
           </div>
           <p style="color:#888; font-size: 13px;">If you didn't request this, you can safely ignore this email.</p>
