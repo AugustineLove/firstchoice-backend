@@ -1,0 +1,1 @@
+export const LOGISTICS_MANAGER_NUMBERS = ['0593528296'];
