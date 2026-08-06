@@ -7,7 +7,8 @@ import {
   getIO,
 } from '../socket/socket.manager';
 import { logger } from '../middleware/logger.middleware';
-import { sendCustomerMessage } from './message.services';
+import { LOGISTICS_MANAGER_NUMBERS } from '../utils/constants';
+import { sendCustomerMessage } from './message.service';
 
 function calculateDeliveryEstimate(
   pickupLat?: number,
@@ -288,8 +289,9 @@ export async function createDeliveryRequest(
   notifyAdmins('admin:new_delivery', payload);
   await NotificationService.notifyNewDelivery(delivery.id);
   sendCustomerMessage({
-  phone: delivery.customer.phone,
-  message: `Your delivery request has been received. Estimated fee: GHS ${delivery.estimatedFee}.`,
+  messageTo: LOGISTICS_MANAGER_NUMBERS,
+  messageFrom: 'FirstChoice',
+  message: `New delivery request: ${delivery.pickupAddress} → ${delivery.destinationAddress}. Est. fee: GHS ${delivery.estimatedFee}.`,
   });
 
   return delivery;
