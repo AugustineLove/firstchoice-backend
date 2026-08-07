@@ -175,7 +175,7 @@ console.log(`Sub total: ${data.subtotal}`);
       messageFrom: 'FirstChoice',
       message: `New order placed: ${order.vendor.businessName} → ${order.deliveryAddress}.\nDelivery Fee: GHS ${order.deliveryFee?.toFixed(2)}\nTotal: GHS ${order.totalAmount?.toFixed(2)}.`,
     });
-
+      notifyRiders('delivery:new_request', order);
     await NotificationService.notifyNewOrder(order.id);
     console.log('Order placed successfully, sending message to logistics managers...');
    
@@ -227,7 +227,7 @@ console.log(`Sub total: ${data.subtotal}`);
       messageFrom: 'FirstChoice',
       message: `New order placed: ${order.vendor.businessName} → ${order.deliveryAddress}.\nDelivery Fee: GHS ${order.deliveryFee?.toFixed(2)}\nTotal: GHS ${order.totalAmount?.toFixed(2)}.`,
     });
-
+  notifyRiders('delivery:new_request', order);
   await NotificationService.notifyNewOrder(order.id);
   await NotificationService.notifyNewDelivery(order.id);
   return order;
