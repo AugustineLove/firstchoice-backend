@@ -291,7 +291,7 @@ export async function createDeliveryRequest(
   sendCustomerMessage({
   messageTo: LOGISTICS_MANAGER_NUMBERS,
   messageFrom: 'FirstChoice',
-  message: `New delivery request: ${delivery.pickupAddress} → ${delivery.destinationAddress}. Est. fee: GHS ${delivery.estimatedFee}.`,
+  message: `New delivery request from ${delivery.customer.name}: ${delivery.pickupAddress} → ${delivery.destinationAddress}. Est. fee: GHS ${delivery.estimatedFee}. Item: ${delivery.itemDescription} \nPhone: ${delivery.customer.phone}`,
   });
 
   return delivery;

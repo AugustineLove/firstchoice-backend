@@ -9,6 +9,8 @@ import {
 } from '../socket/socket.manager';
 import * as NotificationService from './notification.service';
 import cloudinary from '../config/cloudinary';
+import { sendCustomerMessage } from './message.service';
+import { LOGISTICS_MANAGER_NUMBERS } from '../utils/constants';
 
 interface feeData {
   pickupLat?: number,
@@ -167,8 +169,16 @@ console.log(`Sub total: ${data.subtotal}`);
 
       return newOrder;
     }, { timeout: 15000, maxWait: 30000 });
+    
+    sendCustomerMessage({
+      messageTo: LOGISTICS_MANAGER_NUMBERS,
+      messageFrom: 'FirstChoice',
+      message: `New order placed: ${order.vendor.businessName} → ${order.deliveryAddress}.\nDelivery Fee: GHS ${order.deliveryFee?.toFixed(2)}\nTotal: GHS ${order.totalAmount?.toFixed(2)}.`,
+    });
 
     await NotificationService.notifyNewOrder(order.id);
+    console.log('Order placed successfully, sending message to logistics managers...');
+   
     return order;
   }
 
@@ -212,6 +222,11 @@ console.log(`Sub total: ${data.subtotal}`);
       vendor: { select: { businessName: true, logo: true, phone: true } },
     },
   });
+    sendCustomerMessage({
+      messageTo: LOGISTICS_MANAGER_NUMBERS,
+      messageFrom: 'FirstChoice',
+      message: `New order placed: ${order.vendor.businessName} → ${order.deliveryAddress}.\nDelivery Fee: GHS ${order.deliveryFee?.toFixed(2)}\nTotal: GHS ${order.totalAmount?.toFixed(2)}.`,
+    });
 
   await NotificationService.notifyNewOrder(order.id);
   await NotificationService.notifyNewDelivery(order.id);

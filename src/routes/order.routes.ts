@@ -3,6 +3,7 @@ import * as OrderController from '../controllers/order.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { getOrdersReadyForPickup, riderAcceptOrder } from '../services/order.service';
 import multer from 'multer';
+import { requireOperatingHours } from '../middleware/operating.hours';
 
 const orderRouter = Router();
 
@@ -10,12 +11,11 @@ const orderRouter = Router();
 orderRouter.use(authenticate);
 
 // Customer
-orderRouter.post('/', authorize('CUSTOMER'), OrderController.placeOrder);
+orderRouter.post('/', authorize('CUSTOMER'), requireOperatingHours, OrderController.placeOrder);
 orderRouter.delete('/:id/cancel', authorize('CUSTOMER'), OrderController.cancelOrder);
 orderRouter.post('/:id/rider-accept', OrderController.acceptOrder);
 orderRouter.get('/ready-for-pickup', async (req, res) => {
   const orders = await getOrdersReadyForPickup();
-  console.log(JSON.stringify)
   res.json({ success: true, data: orders });
 });
 

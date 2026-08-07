@@ -13,6 +13,7 @@ interface SendMessagePayload {
 }
 
 export async function sendCustomerMessage(payload: SendMessagePayload): Promise<boolean> {
+  console.log('sendCustomerMessage payload:', payload);
   try {
     const res = await fetch(MESSAGE_ENDPOINT, {
       method: 'POST',
