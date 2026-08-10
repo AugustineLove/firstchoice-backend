@@ -25,15 +25,35 @@ interface feeData {
 // to base a fee on — we price off distance instead, same as a delivery.
 function calculateDeliveryFeeByDistance({
   pickupLat, pickupLng, destLat, destLng,
-}: { pickupLat?: number | null; pickupLng?: number | null; destLat?: number | null; destLng?: number | null }) {
-  if (pickupLat == null || pickupLng == null || destLat == null || destLng == null) return 10; // fallback flat fee if coords missing
+}: {
+  pickupLat?: number | null;
+  pickupLng?: number | null;
+  destLat?: number | null;
+  destLng?: number | null;
+}) {
+  if (
+    pickupLat == null ||
+    pickupLng == null ||
+    destLat == null ||
+    destLng == null
+  ) {
+    return 10; // fallback flat fee if coords missing
+  }
 
   const r = 6371;
   const toRad = (d: number) => (d * Math.PI) / 180;
+
   const dLat = toRad(destLat - pickupLat);
   const dLng = toRad(destLng - pickupLng);
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(pickupLat)) * Math.cos(toRad(destLat)) * Math.sin(dLng / 2) ** 2;
-  const km = r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(pickupLat)) *
+      Math.cos(toRad(destLat)) *
+      Math.sin(dLng / 2) ** 2;
+
+  const km =
+    r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
   if (km <= 1) return 5;
   if (km <= 1.5) return 6;
@@ -52,7 +72,35 @@ function calculateDeliveryFeeByDistance({
   if (km <= 8) return 19;
   if (km <= 8.5) return 20;
   if (km <= 9) return 21;
-  return 25;
+  if (km <= 9.5) return 22;
+  if (km <= 10) return 23;
+  if (km <= 10.5) return 24;
+  if (km <= 11) return 25;
+  if (km <= 11.5) return 26;
+  if (km <= 12) return 27;
+  if (km <= 12.5) return 28;
+  if (km <= 13) return 29;
+  if (km <= 13.5) return 30;
+  if (km <= 14) return 31;
+  if (km <= 14.5) return 32;
+  if (km <= 15) return 33;
+  if (km <= 15.5) return 34;
+  if (km <= 16) return 35;
+  if (km <= 16.5) return 36;
+  if (km <= 17) return 37;
+  if (km <= 17.5) return 38;
+  if (km <= 18) return 39;
+  if (km <= 18.5) return 40;
+  if (km <= 19) return 41;
+  if (km <= 19.5) return 42;
+  if (km <= 20) return 43;
+  if (km <= 20.5) return 44;
+  if (km <= 21) return 45;
+  if (km <= 21.5) return 46;
+  if (km <= 22) return 47;
+  if (km <= 22.5) return 48;
+  if (km <= 23) return 49;
+  return 50;
 }
 
 export async function placeOrder(
@@ -228,6 +276,11 @@ console.log(`Sub total: ${data.subtotal}`);
       message: `New order placed: ${order.vendor.businessName} → ${order.deliveryAddress}.\nDelivery Fee: GHS ${order.deliveryFee?.toFixed(2)}\nTotal: GHS ${order.totalAmount?.toFixed(2)}.`,
     });
   notifyRiders('delivery:new_request', order);
+  notifyAdmins('admin:order_ready_for_dispatch', {
+    orderId: order.id,
+    vendorId: order.vendorId,
+    timestamp: new Date(),
+  });
   await NotificationService.notifyNewOrder(order.id);
   await NotificationService.notifyNewDelivery(order.id);
   return order;
