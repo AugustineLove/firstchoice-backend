@@ -8,13 +8,13 @@ interface TimeWindow {
 
 // 0 = Sunday ... 6 = Saturday, matching Date#getDay()
 const OPERATING_HOURS: Record<number, TimeWindow[]> = {
-  0: [{ start: '12:00', end: '22:30' }],                              // Sun
-  1: [{ start: '08:00', end: '18:00' }, { start: '20:30', end: '22:30' }], // Mon
-  2: [{ start: '08:00', end: '22:30' }],                              // Tue
-  3: [{ start: '08:00', end: '18:00' }, { start: '20:30', end: '22:30' }], // Wed
-  4: [{ start: '08:00', end: '22:30' }],                              // Thu
-  5: [{ start: '08:00', end: '18:00' }, { start: '20:30', end: '22:30' }], // Fri
-  6: [{ start: '08:00', end: '22:30' }],                              // Sat
+  0: [{ start: '12:00', end: '22:00' }],                              // Sun
+  1: [{ start: '08:00', end: '18:00' }, { start: '20:30', end: '22:00' }], // Mon
+  2: [{ start: '08:00', end: '22:00' }],                              // Tue
+  3: [{ start: '08:00', end: '18:00' }, { start: '20:30', end: '22:00' }], // Wed
+  4: [{ start: '08:00', end: '22:00' }],                              // Thu
+  5: [{ start: '08:00', end: '18:00' }, { start: '20:30', end: '22:00' }], // Fri
+  6: [{ start: '08:00', end: '22:00' }],                              // Sat
 };
 
 const TIMEZONE = 'Africa/Accra';
