@@ -225,6 +225,7 @@ console.log(`Sub total: ${data.subtotal}`);
     });
       notifyRiders('delivery:new_request', order);
     await NotificationService.notifyNewOrder(order.id);
+    await NotificationService.notifyRidersNewOrder(order.id); 
     console.log('Order placed successfully, sending message to logistics managers...');
    
     return order;
@@ -282,7 +283,7 @@ console.log(`Sub total: ${data.subtotal}`);
     timestamp: new Date(),
   });
   await NotificationService.notifyNewOrder(order.id);
-  await NotificationService.notifyNewDelivery(order.id);
+  await NotificationService.notifyRidersNewOrder(order.id);
   return order;
 }
 

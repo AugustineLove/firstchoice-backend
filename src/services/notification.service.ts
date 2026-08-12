@@ -377,3 +377,24 @@ export async function updateFcmToken(userId: string, token: string): Promise<voi
     data: { fcmToken: token },
   });
 }
+
+// notification.service.ts
+export async function notifyRidersNewOrder(orderId: string): Promise<void> {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { vendor: { select: { businessName: true } } },
+  });
+  if (!order) return;
+
+  const onlineRiders = await prisma.rider.findMany({
+    where: { availability: 'ONLINE' },
+    include: { user: { select: { id: true } } },
+  });
+  if (!onlineRiders.length) return;
+
+  await sendToMany(onlineRiders.map(r => r.user.id), {
+    title: '🚀 New Delivery Request!',
+    body: `${order.vendor.businessName} — GHS ${order.deliveryFee?.toFixed(2) ?? '0.00'} delivery fee • Tap to accept`,
+    data: { type: 'NEW_DELIVERY', orderId: order.id, screen: 'available_deliveries' },
+  });
+}
