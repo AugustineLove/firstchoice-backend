@@ -64,7 +64,7 @@ export function requireOperatingHours(req: Request, res: Response, next: NextFun
     return res.status(403).json({
       success: false,
       message: nextWindow
-        ? `We're currently closed. We'll reopen today at ${nextWindow.start}.`
+        ? `We're currently closed. We'll reopen today at ${nextWindow.start}PM today.`
         : `We're currently closed. Please check back during our operating hours.`,
     });
   }
