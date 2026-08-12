@@ -519,20 +519,70 @@ export async function getAllOrders(filters: {
       where,
       skip,
       take: limit,
-      orderBy: { createdAt: 'desc' },
+      orderBy: {
+        createdAt: 'desc',
+      },
+
       include: {
-        customer: { select: { name: true, phone: true } },
-        vendor: { select: { businessName: true } },
-        rider: {
-          select: { user: { select: { name: true, phone: true } } },
+        // This is actually the User who placed the order
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            email: true,
+            role: true,
+          },
         },
-        items: { include: { product: { select: { name: true } } } },
+
+        // Vendor
+        vendor: {
+          select: {
+            id: true,
+            businessName: true,
+            phone: true,
+            address: true,
+            logo: true,
+          },
+        },
+
+        // Rider
+        rider: {
+          select: {
+            id: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+              },
+            },
+          },
+        },
+
+        // Ordered products
+        items: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                price: true,
+                images: true,
+              },
+            },
+          },
+        },
       },
     }),
-    prisma.order.count({ where }),
+
+    prisma.order.count({
+      where,
+    }),
   ]);
 
-  console.log(`Orders: ${orders}`)
+  console.log(`Orders: ${orders.length}`);
+
   return {
     orders,
     pagination: {
