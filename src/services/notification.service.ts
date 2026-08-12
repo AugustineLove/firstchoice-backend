@@ -393,7 +393,7 @@ export async function notifyRidersNewOrder(orderId: string): Promise<void> {
   if (!onlineRiders.length) return;
 
   await sendToMany(onlineRiders.map(r => r.user.id), {
-    title: '🚀 New Delivery Request!',
+    title: '🚀 New Order Request!',
     body: `${order.vendor.businessName} — GHS ${order.deliveryFee?.toFixed(2) ?? '0.00'} delivery fee • Tap to accept`,
     data: { type: 'NEW_DELIVERY', orderId: order.id, screen: 'available_deliveries' },
   });
