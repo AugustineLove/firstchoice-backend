@@ -203,6 +203,7 @@ console.log(`Sub total: ${data.subtotal}`);
           items: { create: orderItems },
         },
         include: {
+          customer: { select: { id: true, name: true, phone: true } },
           items: { include: { product: { select: { name: true, images: true } } } },
           vendor: { select: { businessName: true, logo: true, phone: true } },
         },
