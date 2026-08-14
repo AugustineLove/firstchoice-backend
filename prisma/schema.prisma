@@ -78,6 +78,16 @@ enum OrderType {
   ERRAND
 }
 
+enum DeliveryKind {
+  PICKUP
+  ERRAND
+}
+
+enum ErrandPricingMode {
+  FIXED
+  PER_ITEM
+}
+
 // ─── MODELS ──────────────────────────────────────────────
 
 model User {
@@ -304,37 +314,53 @@ model DeliveryRequest {
   assignedRiderId     String?
   rider               Rider?         @relation(fields: [assignedRiderId], references: [id])
 
+  type                DeliveryKind   @default(PICKUP)   // ← new
+
   pickupAddress       String
-  pickupLatitude      Float?          // ← new
-  pickupLongitude     Float?          // ← new
+  pickupLatitude      Float?
+  pickupLongitude     Float?
 
   destinationAddress  String
-  destinationLatitude  Float?         // ← new
-  destinationLongitude Float?         // ← new
+  destinationLatitude  Float?
+  destinationLongitude Float?
 
-  itemDescription     String
-  estimatedFee        Float
-  paymentMethod       PaymentMethod  @default(CASH)   // ← was missing
+  itemDescription     String                              // for PICKUP; auto-summarized for ERRAND
+  errandItems         Json?                                // ← new: string[] of errand lines
+  deliveryFee         Float          @default(0)          // ← new: distance-based portion
+  errandFee           Float          @default(0)          // ← new: fixed or per-item portion
+  estimatedFee        Float                                // = deliveryFee + errandFee (kept for compatibility)
+
+  paymentMethod       PaymentMethod  @default(CASH)
   status              DeliveryStatus @default(PENDING)
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
 
   recipientName   String?
   recipientPhone  String?
-
   imageUrl        String?
-  
 }
 
 model Location {
-  id        String   @id @default(cuid())
-  name      String                          // e.g. "Agona Nkwanta Market"
-  address   String                          // full address string shown to user
+  id        String     @id @default(cuid())
+  name      String
+  address   String
   latitude  Float
   longitude Float
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  usedAsErrandPickupBy Settings[]      // ← new
+}
+
+model Settings {
+  id                      Int               @id @default(1)
+  errandPricingMode       ErrandPricingMode @default(FIXED)
+  errandFixedPrice        Float             @default(20)
+  errandPerItemPrice      Float             @default(5)
+  errandPickupLocationId  String?
+  errandPickupLocation    Location?         @relation(fields: [errandPickupLocationId], references: [id])
+  updatedAt               DateTime          @updatedAt
 }
 
 model Errand {
