@@ -65,7 +65,7 @@ export function requireOperatingHours(req: Request, res: Response, next: NextFun
       success: false,
       message: nextWindow
         ? `We're currently closed. We'll reopen today at ${nextWindow.start}PM.`
-        : `We're currently closed. Please check back during our operating hours.`,
+        : `We're currently closed. Please check back during our working hours.`,
     });
   }
 
