@@ -122,6 +122,7 @@ const fullProductInclude = {
       logo: true,
       address: true,
       rating: true,
+      phone: true,
     },
   },
 };
