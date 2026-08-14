@@ -5,7 +5,7 @@ import { prisma } from '../config/prisma';
 interface VariantGroupInput {
   name: string;
   required?: boolean;
-  variants: { name: string; priceAdjustment?: number; available?: boolean }[];
+  variants: { name: string; priceAdjustment?: number; available?: boolean; images?: string[] }[];
 }
 
 type IncrementMode = 'multiple' | 'free' | 'halves' | 'custom';

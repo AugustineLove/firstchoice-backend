@@ -117,7 +117,8 @@ model User {
 
   firebaseUid String? @unique
 
-  vendorRatings VendorRating[] 
+  vendorRatings  VendorRating[]
+  productReviews ProductReview[]
 
   telegramChatId         String?
   telegramLinkCode       String?   @unique
@@ -199,13 +200,14 @@ model Product {
   variantGroups   ProductVariantGroup[]
   addonGroups     ProductAddonGroup[]
   attributes      ProductAttribute[]
+  reviews         ProductReview[]
 }
 
 model ProductVariantGroup {
   id        String           @id @default(cuid())
   productId String
   product   Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
-  name      String           // "Size", "Weight", "Volume"
+  name      String           // "Size", "Weight", "Volume", "Storage", "Color"
   required  Boolean          @default(true)
   variants  ProductVariant[]
 }
@@ -214,9 +216,12 @@ model ProductVariant {
   id        String              @id @default(cuid())
   groupId   String
   group     ProductVariantGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  name      String              // "Small", "Medium", "Large", "500g"
+  name      String              // "Small", "Medium", "Large", "500g", "256GB", "Midnight Black"
   priceAdjustment Float         @default(0) // +/- from base price
   available Boolean             @default(true)
+  images    String[]            @default([]) // variant-specific gallery, e.g. per-colour shots.
+                                               // Falls back to the parent product's images
+                                               // on the frontend when empty.
 }
 
 model ProductAddonGroup {
@@ -256,6 +261,25 @@ model ProductAttribute {
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   key       String  // "Brand", "Manufacturer", "Storage", "Ingredients"
   value     String
+}
+
+// Product-level reviews (separate from VendorRating, which rates the
+// vendor as a whole). One review per customer per product — enforced
+// by the unique constraint, same pattern as VendorRating.
+model ProductReview {
+  id         String   @id @default(cuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   User     @relation(fields: [customerId], references: [id])
+  orderId    String?  // optional: order this review is tied to, for a future "verified purchase" badge
+  rating     Int      // 1–5, enforced in the service layer
+  comment    String?
+  images     String[] @default([])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([productId, customerId])
 }
 
 model Order {
