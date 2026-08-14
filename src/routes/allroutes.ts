@@ -10,6 +10,7 @@ import errandRouter from "./errand.routes";
 import transactionRouter from "./transaction.routes";
 import adminRouter from "./admin.routes";
 import locationRouter from "./location.routes";
+import settingsRouter from "./settings.routes";
 
 const allRoutes = Router();
 
@@ -24,5 +25,6 @@ allRoutes.use('/api/errands', errandRouter);
 allRoutes.use('/api/transactions', transactionRouter);
 allRoutes.use('/api/admin', adminRouter);
 allRoutes.use('/api/locations', locationRouter);
+allRoutes.use('/api/settings', settingsRouter); // Import settings routes
 
 export default allRoutes;

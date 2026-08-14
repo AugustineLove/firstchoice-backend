@@ -1,4 +1,4 @@
-import { DeliveryStatus, PaymentMethod } from '@prisma/client';
+import { DeliveryStatus, PaymentMethod, DeliveryKind } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import { notifyUser, notifyAdmins } from '../socket/socket.manager';
 import * as NotificationService from './notification.service';
@@ -9,6 +9,7 @@ import {
 import { logger } from '../middleware/logger.middleware';
 import { LOGISTICS_MANAGER_NUMBERS } from '../utils/constants';
 import { sendCustomerMessage } from './message.service';
+import { getSettings } from './setting.service';
 
 function calculateDeliveryEstimate(
   pickupLat?: number,
@@ -80,6 +81,25 @@ function calculateDeliveryEstimate(
 
   return 0;
 }
+
+function calculateErrandFee(
+  mode: 'FIXED' | 'PER_ITEM',
+  fixedPrice: number,
+  perItemPrice: number,
+  itemCount: number,
+): number {
+  if (mode === 'PER_ITEM') return Math.max(itemCount, 0) * perItemPrice;
+  return fixedPrice;
+}
+
+function summarizeErrandItems(items: { text: string; estimatedPrice: number }[]): string {
+  if (items.length === 0) return 'Errand request';
+  const shown = items.slice(0, 3).map((i) => i.text).join(', ');
+  const extra = items.length > 3 ? ` +${items.length - 3} more` : '';
+  return `Errand: ${shown}${extra}`;
+}
+
+
  
 export async function getDeliveryById(deliveryId: string, userId: string) {
   const delivery = await prisma.deliveryRequest.findUnique({
@@ -256,69 +276,125 @@ export async function deleteLocation(id: string) {
 export async function createDeliveryRequest(
   customerId: string,
   data: {
-    pickupAddress: string;
+    type?: 'PICKUP' | 'ERRAND';
+    pickupAddress?: string;
     pickupLatitude?: number;
     pickupLongitude?: number;
     destinationAddress: string;
     destinationLatitude?: number;
     destinationLongitude?: number;
-    itemDescription: string;
+    itemDescription?: string;
+    errandItems?: { text: string; estimatedPrice: number }[];   // ← shape changed
     paymentMethod: 'CASH' | 'MOMO';
     recipientName?: string;
     recipientPhone?: string;
     imageUrl?: string;
   }
 ) {
-  const estimatedFee = calculateDeliveryEstimate(
-    data.pickupLatitude, data.pickupLongitude, data.destinationLatitude, data.destinationLongitude
+  const type: DeliveryKind = data.type === 'ERRAND' ? 'ERRAND' : 'PICKUP';
+
+  let pickupAddress = data.pickupAddress?.trim() || '';
+  let pickupLatitude = data.pickupLatitude;
+  let pickupLongitude = data.pickupLongitude;
+  let itemDescription = data.itemDescription?.trim() || '';
+  let errandItemsClean: { text: string; estimatedPrice: number }[] = [];
+  let errandFee = 0;
+  let itemsEstimatedTotal = 0;
+
+  if (type === 'ERRAND') {
+    const settings = await getSettings();
+    if (!settings.errandPickupLocation) {
+      throw new Error('Errand pickup location has not been configured yet. Please contact support.');
+    }
+
+    errandItemsClean = (data.errandItems || [])
+      .map((it) => ({
+        text: (it.text || '').trim(),
+        estimatedPrice: Math.max(0, Number(it.estimatedPrice) || 0),
+      }))
+      .filter((it) => it.text.length > 0);
+
+    if (errandItemsClean.length === 0) {
+      throw new Error('Please add at least one item to the errand list.');
+    }
+
+    pickupAddress = settings.errandPickupLocation.address;
+    pickupLatitude = settings.errandPickupLocation.latitude;
+    pickupLongitude = settings.errandPickupLocation.longitude;
+    itemDescription = summarizeErrandItems(errandItemsClean);
+
+    itemsEstimatedTotal = errandItemsClean.reduce((sum, it) => sum + it.estimatedPrice, 0);
+
+    errandFee = calculateErrandFee(
+      settings.errandPricingMode,
+      settings.errandFixedPrice,
+      settings.errandPerItemPrice,
+      errandItemsClean.length,
+    );
+  } else {
+    if (!pickupAddress) throw new Error('Pickup address is required.');
+    if (!itemDescription) throw new Error('Item description is required.');
+  }
+
+  const deliveryFee = calculateDeliveryEstimate(
+    pickupLatitude, pickupLongitude, data.destinationLatitude, data.destinationLongitude,
   );
+  const estimatedFee = deliveryFee + errandFee; // service fee only — items cost tracked separately
 
   const delivery = await prisma.deliveryRequest.create({
     data: {
       customerId,
-      pickupAddress:        data.pickupAddress.trim(),
-      pickupLatitude:       data.pickupLatitude,
-      pickupLongitude:      data.pickupLongitude,
+      type,
+      pickupAddress,
+      pickupLatitude,
+      pickupLongitude,
       destinationAddress:   data.destinationAddress.trim(),
       destinationLatitude:  data.destinationLatitude,
       destinationLongitude: data.destinationLongitude,
-      itemDescription:      data.itemDescription.trim(),
+      itemDescription,
+      errandItems:          type === 'ERRAND' ? errandItemsClean : undefined,
+      itemsEstimatedTotal,
+      deliveryFee,
+      errandFee,
       estimatedFee,
-      paymentMethod:        data.paymentMethod,
-      recipientName:        data.recipientName?.trim() || null,
-      recipientPhone:       data.recipientPhone?.trim() || null,
-      imageUrl:             data.imageUrl || null,
+      paymentMethod:  data.paymentMethod,
+      recipientName:  data.recipientName?.trim() || null,
+      recipientPhone: data.recipientPhone?.trim() || null,
+      imageUrl:       data.imageUrl || null,
     },
-    include: {
-      customer: { select: { name: true, phone: true } },
-    },
+    include: { customer: { select: { name: true, phone: true } } },
   });
 
+  const itemsLine = type === 'ERRAND'
+    ? `\nErrand list:\n${errandItemsClean.map((it) => `- ${it.text} (~GHS ${it.estimatedPrice.toFixed(2)})`).join('\n')}\nEstimated items cost: GHS ${itemsEstimatedTotal.toFixed(2)}`
+    : `\nItem: ${itemDescription}`;
+
   const payload = {
-    type:            'NEW_DELIVERY',
-    deliveryId:      delivery.id,
-    pickupAddress:   delivery.pickupAddress,
+    type: type === 'ERRAND' ? 'NEW_ERRAND' : 'NEW_DELIVERY',
+    deliveryId: delivery.id,
+    kind: type,
+    pickupAddress: delivery.pickupAddress,
     destinationAddress: delivery.destinationAddress,
     itemDescription: delivery.itemDescription,
-    estimatedFee:    delivery.estimatedFee,
-    paymentMethod:   delivery.paymentMethod,
-    recipientName:   delivery.recipientName,
-    recipientPhone:  delivery.recipientPhone,
-    imageUrl:        delivery.imageUrl,
-    customer: {
-      name:  delivery.customer.name,
-      phone: delivery.customer.phone,
-    },
+    errandItems: type === 'ERRAND' ? errandItemsClean : undefined,
+    itemsEstimatedTotal,
+    deliveryFee, errandFee, estimatedFee: delivery.estimatedFee,
+    paymentMethod: delivery.paymentMethod,
+    recipientName: delivery.recipientName,
+    recipientPhone: delivery.recipientPhone,
+    imageUrl: delivery.imageUrl,
+    customer: { name: delivery.customer.name, phone: delivery.customer.phone },
     createdAt: delivery.createdAt,
   };
 
   notifyRiders('delivery:new_request', payload);
   notifyAdmins('admin:new_delivery', payload);
   await NotificationService.notifyNewDelivery(delivery.id);
+
   sendCustomerMessage({
-  messageTo: LOGISTICS_MANAGER_NUMBERS,
-  messageFrom: 'FirstChoice',
-  message: `New delivery request from ${delivery.customer.name}: ${delivery.pickupAddress} → ${delivery.destinationAddress}. Est. fee: GHS ${delivery.estimatedFee}. Item: ${delivery.itemDescription} \nPhone: ${delivery.customer.phone}`,
+    messageTo: LOGISTICS_MANAGER_NUMBERS,
+    messageFrom: 'FirstChoice',
+    message: `New ${type === 'ERRAND' ? 'errand' : 'delivery'} request from ${delivery.customer.name}: ${delivery.pickupAddress} → ${delivery.destinationAddress}. Service fee: GHS ${delivery.estimatedFee} (delivery GHS ${deliveryFee} + errand GHS ${errandFee}).${itemsLine}\nPhone: ${delivery.customer.phone}`,
   });
 
   return delivery;
@@ -401,7 +477,7 @@ export async function riderAcceptDelivery(
 const validTransitions: Record<DeliveryStatus, DeliveryStatus[]> = {
   PENDING:    ['ACCEPTED', 'CANCELLED'],
   ACCEPTED:   ['PICKED_UP', 'CANCELLED'],
-  PICKED_UP:  ['IN_TRANSIT'],
+  PICKED_UP:  ['IN_TRANSIT', 'CANCELLED'],   // ← was [] before, now cancellable
   IN_TRANSIT: ['DELIVERED'],
   DELIVERED:  [],
   CANCELLED:  [],
@@ -430,12 +506,13 @@ export async function updateDeliveryStatus(
   }
 
   if (newStatus === 'CANCELLED') {
-    const isCustomer = delivery.customerId === userId;
-    const isAdmin    = user.role === 'ADMIN';
-    if (!isCustomer && !isAdmin)
-      throw new Error('Only the customer or admin can cancel');
-    if (!['PENDING', 'ACCEPTED'].includes(delivery.status))
-      throw new Error('This delivery can no longer be cancelled');
+  const isCustomer = delivery.customerId === userId;
+  const isAdmin = user.role === 'ADMIN';
+  const isAssignedRider = !!rider && rider.id === delivery.assignedRiderId;
+  if (!isCustomer && !isAdmin && !isAssignedRider)
+    throw new Error('Only the customer, admin, or assigned rider can cancel');
+  if (!['PENDING', 'ACCEPTED', 'PICKED_UP'].includes(delivery.status))
+    throw new Error('This delivery can no longer be cancelled');
   }
 
   const allowed = validTransitions[delivery.status];

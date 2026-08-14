@@ -326,6 +326,7 @@ model DeliveryRequest {
 
   itemDescription     String                              // for PICKUP; auto-summarized for ERRAND
   errandItems         Json?                                // ← new: string[] of errand lines
+  itemsEstimatedTotal Float     @default(0) 
   deliveryFee         Float          @default(0)          // ← new: distance-based portion
   errandFee           Float          @default(0)          // ← new: fixed or per-item portion
   estimatedFee        Float                                // = deliveryFee + errandFee (kept for compatibility)

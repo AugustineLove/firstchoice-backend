@@ -27,14 +27,14 @@ export async function createDelivery(req: AuthRequest, res: Response) {
       pickupAddress, destinationAddress, itemDescription, paymentMethod,
       recipientName, recipientPhone, imageUrl,
     } = req.body;
-
-    if (!pickupAddress || !destinationAddress || !itemDescription) {
-      res.status(400).json({
-        success: false,
-        message: 'pickupAddress, destinationAddress and itemDescription are required',
-      });
-      return;
-    }
+      console.log(req.body);
+    // if (!pickupAddress || !destinationAddress || !itemDescription) {
+    //   res.status(400).json({
+    //     success: false,
+    //     message: 'pickupAddress, destinationAddress and itemDescription are required',
+    //   });
+    //   return;
+    // }
 
     if (!paymentMethod || !['CASH', 'MOMO'].includes(paymentMethod)) {
       res.status(400).json({ success: false, message: 'paymentMethod must be CASH or MOMO' });
@@ -51,6 +51,7 @@ export async function createDelivery(req: AuthRequest, res: Response) {
     const delivery = await DeliveryService.createDeliveryRequest(req.user!.id, req.body);
     res.status(201).json({ success: true, data: delivery });
   } catch (err: any) {
+    console.log(err);
     res.status(400).json({ success: false, message: err.message });
   }
 }

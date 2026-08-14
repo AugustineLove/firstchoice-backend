@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as AdminController from '../controllers/admin.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
+import { getAdminSettings, patchAdminSettings } from '../controllers/settings.controller';
 
 const adminRouter = Router();
 
@@ -24,6 +25,10 @@ adminRouter.patch('/vendors/:vendorId', AdminController.updateVendorProfile);   
 adminRouter.patch('/vendors/:vendorId/status', AdminController.updateVendorStatus);
 adminRouter.post('/vendors/:vendorId/products', AdminController.addVendorProduct);    // NEW
 adminRouter.delete('/products/:productId', AdminController.deleteVendorProduct);      // NEW
+
+// Settings
+adminRouter.get('/settings', getAdminSettings);
+adminRouter.patch('/settings', patchAdminSettings);
 
 // Riders
 adminRouter.get('/riders', AdminController.getAllRiders);

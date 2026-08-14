@@ -334,13 +334,13 @@ export async function getOrderById(orderId: string, userId: string) {
 // Rider: pick up, deliver
 // Customer/Admin: cancel
 const validTransitions: Record<OrderStatus, OrderStatus[]> = {
-  PENDING: ['RIDER_ASSIGNED', 'CANCELLED'],
-  RIDER_ASSIGNED: ['PICKED_UP', 'CANCELLED'],
-  PICKED_UP: ['IN_TRANSIT'],
-  IN_TRANSIT: ['DELIVERED'],
-  DELIVERED: [],
-  CANCELLED: [],
-  ACCEPTED: [],
+  PENDING:         ['RIDER_ASSIGNED', 'CANCELLED'],
+  RIDER_ASSIGNED:  ['PICKED_UP', 'CANCELLED'],
+  PICKED_UP:       ['IN_TRANSIT', 'CANCELLED'],   // ← added
+  IN_TRANSIT:      ['DELIVERED'],
+  DELIVERED:       [],
+  CANCELLED:       [],
+  ACCEPTED:        [],
 };
 
 export async function updateOrderStatus(
@@ -361,74 +361,44 @@ export async function updateOrderStatus(
   const rider = await prisma.rider.findUnique({ where: { userId } });
 
   // Role-based permission checks
-  // if (newStatus === 'ACCEPTED') {
-  //   if (vendor?.id !== order.vendorId)
-  //     throw new Error('Only the vendor can update to this status');
-  // }
-
   if (newStatus === 'PICKED_UP' || newStatus === 'DELIVERED') {
     if (rider?.id !== order.riderId)
       throw new Error('Only the assigned rider can update to this status');
   }
 
-  // if (newStatus === 'RIDER_ASSIGNED' && user.role !== 'ADMIN')
-  //   throw new Error('Only admin can assign riders');
-
+  // ── Rider self-assignment is a special path, not a plain transition ──
   if (newStatus === 'RIDER_ASSIGNED') {
-  if (!rider)
-    throw new Error('Only riders can accept orders');
+    if (!rider) throw new Error('Only riders can accept orders');
+    if (order.riderId) throw new Error('Order has already been assigned');
 
-  if (order.riderId)
-    throw new Error('Order has already been assigned');
+    await prisma.$transaction(async (tx) => {
+      const current = await tx.order.findUnique({ where: { id: orderId } });
+      if (!current || current.riderId) {
+        throw new Error('Order already assigned');
+      }
+      await tx.order.update({
+        where: { id: orderId },
+        data: { riderId: rider.id, orderStatus: 'RIDER_ASSIGNED' },
+      });
+    });
 
-  await prisma.$transaction(async (tx) => {
-  const current = await tx.order.findUnique({
-    where: { id: orderId },
-  });
-
-  if (!current || current.riderId) {
-    throw new Error('Order already assigned');
+    await emitOrderEvent(orderId, 'RIDER_ASSIGNED');
+    await NotificationService.notifyOrderStatusChange(orderId, 'RIDER_ASSIGNED');
+    return;
   }
 
-  await tx.order.update({
-    where: { id: orderId },
-    data: {
-      riderId: rider.id,
-      orderStatus: 'RIDER_ASSIGNED',
-    },
-  });
-});
-
-  await emitOrderEvent(orderId, 'RIDER_ASSIGNED');
-  await NotificationService.notifyOrderStatusChange(
-    orderId,
-    'RIDER_ASSIGNED'
-  );
-
-  return;
-}
-
+  // ── Cancel permission + eligible states ──
   if (newStatus === 'CANCELLED') {
-    const cancellable = ['PENDING', 'ACCEPTED'];
-    if (!cancellable.includes(order.orderStatus))
+    const isCustomer = order.customerId === userId;
+    const isAdmin = user.role === 'ADMIN';
+    const isAssignedRider = !!rider && rider.id === order.riderId;
+    if (!isCustomer && !isAdmin && !isAssignedRider)
+      throw new Error('Only the customer, admin, or assigned rider can cancel');
+    if (!['PENDING', 'RIDER_ASSIGNED', 'PICKED_UP'].includes(order.orderStatus))
       throw new Error('Order can no longer be cancelled');
   }
-  if (newStatus ==='PENDING'){
-    console.log('PENDING reached');
-    console.log({
-      type: 'NEW_DELIVERY',
-      orderId: order.id,
-      pickupAddress: vendor?.address,
-      destinationAddress: order.deliveryAddress,
-      itemDescription: order.notes,
-      estimatedFee: order.deliveryFee,
-      paymentMethod: order.paymentMethod,
-      customer: {
-        name: order.recipientName,
-        phone: order.recipientPhone,
-      },
-      createdAt: order.createdAt
-    })
+
+  if (newStatus === 'PENDING') {
     notifyRiders('delivery:new_request', {
       type: 'NEW_DELIVERY',
       orderId: order.id,
@@ -437,37 +407,42 @@ export async function updateOrderStatus(
       itemDescription: order.notes,
       estimatedFee: order.deliveryFee,
       paymentMethod: order.paymentMethod,
-      customer: {
-        name: order.recipientName,
-        phone: order.recipientPhone,
-      },
-      createdAt: order.createdAt
-    })
+      customer: { name: order.recipientName, phone: order.recipientPhone },
+      createdAt: order.createdAt,
+    });
   }
 
-  // Validate transition
+  // ── Validate the transition against the state machine ──
   const allowed = validTransitions[order.orderStatus];
   if (!allowed.includes(newStatus))
-    throw new Error(
-      `Cannot transition from ${order.orderStatus} to ${newStatus}`
-    );
+    throw new Error(`Cannot transition from ${order.orderStatus} to ${newStatus}`);
+
+  // ── Apply it, freeing the rider if this was a cancel ──
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.order.update({
+      where: { id: orderId },
+      data: { orderStatus: newStatus },
+      include: {
+        items: { include: { product: { select: { name: true } } } },
+        vendor: { select: { businessName: true } },
+        rider: { select: { user: { select: { name: true, phone: true } } } },
+      },
+    });
+
+    if (newStatus === 'CANCELLED' && order.riderId) {
+      await tx.rider.update({
+        where: { id: order.riderId },
+        data: { availability: 'ONLINE' },
+      });
+    }
+
+    return result;
+  });
 
   await emitOrderEvent(orderId, newStatus);
   await NotificationService.notifyOrderStatusChange(orderId, newStatus);
-  
-  return prisma.order.update({
-    where: { id: orderId },
-    data: { orderStatus: newStatus },
-    include: {
-      items: {
-        include: { product: { select: { name: true } } },
-      },
-      vendor: { select: { businessName: true } },
-      rider: {
-        select: { user: { select: { name: true, phone: true } } },
-      },
-    },
-  });
+
+  return updated;
 }
 
 export async function cancelOrder(orderId: string, userId: string) {

@@ -9,7 +9,7 @@ const deliveryRouter = Router();
 deliveryRouter.use(authenticate);
 
 // Customer
-deliveryRouter.post('/', authorize('CUSTOMER'), requireOperatingHours, DeliveryController.createDelivery);
+deliveryRouter.post('/', authorize('CUSTOMER'), DeliveryController.createDelivery);
 deliveryRouter.get('/pending',        authorize('RIDER'), DeliveryController.getPendingDeliveries);
 
 // Customer, Rider, Admin
