@@ -385,6 +385,11 @@ model Settings {
   errandPerItemPrice      Float             @default(5)
   errandPickupLocationId  String?
   errandPickupLocation    Location?         @relation(fields: [errandPickupLocationId], references: [id])
+
+  operatingHours          Json?             // { "0": [{start,end}], "1": [...], ... } — null = use defaults
+  overrideActive          Boolean           @default(false)
+  overrideExpiresAt       DateTime?         // when the manual "accept orders anyway" window ends
+
   updatedAt               DateTime          @updatedAt
 }
 
