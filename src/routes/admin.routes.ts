@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import * as AdminController from '../controllers/admin.controller';
+import * as SettingsController from '../controllers/settings.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { getAdminSettings, patchAdminSettings } from '../controllers/settings.controller';
 
@@ -42,5 +43,10 @@ adminRouter.get('/analytics/riders', AdminController.getRiderAnalytics);
 
 // Broadcast notifications
 adminRouter.post('/broadcast', AdminController.broadcastNotification);
+
+
+adminRouter.patch('/operating-hours', authorize('ADMIN'), SettingsController.updateOperatingHours);
+adminRouter.post('/operating-override', authorize('ADMIN'), SettingsController.setOperatingOverride);
+adminRouter.delete('/operating-override', authorize('ADMIN'), SettingsController.clearOperatingOverride);
 
 export default adminRouter;

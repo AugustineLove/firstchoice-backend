@@ -20,3 +20,40 @@ export async function patchAdminSettings(req: Request, res: Response) {
     res.status(400).json({ success: false, message: e.message || 'Could not save settings' });
   }
 }
+
+export async function getOperatingStatus(req: Request, res: Response) {
+  try {
+    const status = await SettingsService.getOperatingStatus();
+    return res.json({ success: true, data: status });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+}
+
+export async function updateOperatingHours(req: Request, res: Response) {
+  try {
+    const updated = await SettingsService.updateOperatingHours(req.body.hours);
+    return res.json({ success: true, data: updated });
+  } catch (err: any) {
+    return res.status(400).json({ success: false, message: err.message });
+  }
+}
+
+export async function setOperatingOverride(req: Request, res: Response) {
+  try {
+    const { durationMinutes } = req.body;
+    const updated = await SettingsService.setOperatingOverride(Number(durationMinutes));
+    return res.json({ success: true, data: updated });
+  } catch (err: any) {
+    return res.status(400).json({ success: false, message: err.message });
+  }
+}
+
+export async function clearOperatingOverride(req: Request, res: Response) {
+  try {
+    const updated = await SettingsService.clearOperatingOverride();
+    return res.json({ success: true, data: updated });
+  } catch (err: any) {
+    return res.status(400).json({ success: false, message: err.message });
+  }
+}

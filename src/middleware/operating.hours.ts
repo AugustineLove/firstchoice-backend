@@ -1,5 +1,8 @@
 // middleware/operatingHours.ts
 import { Request, Response, NextFunction } from 'express';
+import { getOperatingStatus } from '../services/setting.service';
+import { formatTime } from '../utils/operatingHours.util';
+
 
 interface TimeWindow {
   start: string; // 'HH:mm'
@@ -57,17 +60,26 @@ function isWithinOperatingHours(): { open: boolean; nextWindow?: TimeWindow } {
   return { open: false, nextWindow: upcoming };
 }
 
-export function requireOperatingHours(req: Request, res: Response, next: NextFunction) {
-  const { open, nextWindow } = isWithinOperatingHours();
+// middleware/operatingHours.ts
 
-  if (!open) {
-    return res.status(403).json({
-      success: false,
-      message: nextWindow
-        ? `We're currently closed. We'll reopen today at ${nextWindow.start}PM.`
-        : `We're currently closed. Please check back during our working hours.`,
-    });
+export async function requireOperatingHours(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { open, nextWindow } = await getOperatingStatus();
+
+    if (!open) {
+      return res.status(403).json({
+        success: false,
+        message: nextWindow
+          ? `We're currently closed. We'll reopen today at ${formatTime(nextWindow.start)}.`
+          : `We're currently closed. Please check back during our working hours.`,
+      });
+    }
+
+    next();
+  } catch (err) {
+    // A DB/cache hiccup here shouldn't block every order in the app —
+    // log it and let the request through rather than fail-closed.
+    console.error('[operatingHours] check failed, allowing request through:', err);
+    next();
   }
-
-  next();
 }
