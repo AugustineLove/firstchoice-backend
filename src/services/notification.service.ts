@@ -410,7 +410,7 @@ export async function sendBroadcastNotification(payload: {
     where: {
       status: 'ACTIVE',
       ...(payload.role && { role: payload.role }),
-      OR: [{ fcmToken: { not: null } }, { webFcmToken: { not: null } }],
+      OR: [{ webFcmToken: { not: null } }, { fcmToken: { not: null } }],
     },
     select: { id: true },
   });
