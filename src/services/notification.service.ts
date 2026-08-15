@@ -398,3 +398,28 @@ export async function notifyRidersNewOrder(orderId: string): Promise<void> {
     data: { type: 'NEW_DELIVERY', orderId: order.id, screen: 'available_deliveries' },
   });
 }
+
+// ─── BROADCAST NOTIFICATIONS ──────────────────────────────
+
+export async function sendBroadcastNotification(payload: {
+  title: string;
+  body: string;
+  role?: 'CUSTOMER' | 'VENDOR' | 'RIDER'; // omit = everyone
+}): Promise<{ total: number }> {
+  const users = await prisma.user.findMany({
+    where: {
+      status: 'ACTIVE',
+      ...(payload.role && { role: payload.role }),
+      OR: [{ fcmToken: { not: null } }, { webFcmToken: { not: null } }],
+    },
+    select: { id: true },
+  });
+
+  await sendToMany(users.map(u => u.id), {
+    title: payload.title,
+    body: payload.body,
+    data: { type: 'BROADCAST', screen: 'home' },
+  });
+
+  return { total: users.length };
+}

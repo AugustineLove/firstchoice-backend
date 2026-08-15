@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import * as AdminService from '../services/admin.service';
+import * as NotificationService from '../services/notification.service';
 import { UserStatus, VendorStatus } from '@prisma/client';
 
 
@@ -174,3 +175,19 @@ export async function getRiderAnalytics(req: Request, res: Response) {
   }
 }
 
+export async function broadcastNotification(req: Request, res: Response) {
+  try {
+    const { title, message, role } = req.body;
+    if (!title?.trim() || !message?.trim()) {
+      return res.status(400).json({ success: false, message: 'Title and message are required' });
+    }
+    const result = await NotificationService.sendBroadcastNotification({
+      title: title.trim(),
+      body: message.trim(),
+      role: role || undefined,
+    });
+    return res.json({ success: true, data: result });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message || 'Failed to send broadcast' });
+  }
+}

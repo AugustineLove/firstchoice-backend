@@ -40,4 +40,7 @@ adminRouter.patch('/orders/:orderId/assign', AdminController.assignRiderToOrder)
 adminRouter.get('/analytics/orders', AdminController.getOrderAnalytics);
 adminRouter.get('/analytics/riders', AdminController.getRiderAnalytics);
 
+// Broadcast notifications
+adminRouter.post('/broadcast', AdminController.broadcastNotification);
+
 export default adminRouter;
