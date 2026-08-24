@@ -114,21 +114,51 @@ export async function getRiderEarnings(userId: string) {
   const rider = await prisma.rider.findUnique({ where: { userId } });
   if (!rider) throw new Error('Rider profile not found');
 
-  const [completedOrders, completedDeliveries] = await Promise.all([
-    prisma.order.count({
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+
+  const [allOrders, allDeliveries, todayOrders, todayDeliveries] = await Promise.all([
+    prisma.order.findMany({
       where: { riderId: rider.id, orderStatus: 'DELIVERED' },
+      select: { deliveryFee: true },
     }),
-    prisma.deliveryRequest.count({
+    prisma.deliveryRequest.findMany({
       where: { assignedRiderId: rider.id, status: 'DELIVERED' },
+      select: { estimatedFee: true },
+    }),
+    prisma.order.findMany({
+      where: { riderId: rider.id, orderStatus: 'DELIVERED', updatedAt: { gte: startOfToday } },
+      select: { deliveryFee: true },
+    }),
+    prisma.deliveryRequest.findMany({
+      where: { assignedRiderId: rider.id, status: 'DELIVERED', updatedAt: { gte: startOfToday } },
+      select: { estimatedFee: true },
     }),
   ]);
 
+  const sum = (arr: (number | null)[]) => arr.reduce((s: number, n) => s + (n ?? 0), 0);
+
+  const allOrdersEarnings      = sum(allOrders.map(o => o.deliveryFee));
+  const allDeliveriesEarnings  = sum(allDeliveries.map(d => d.estimatedFee));
+  const todayOrdersEarnings    = sum(todayOrders.map(o => o.deliveryFee));
+  const todayDeliveriesEarnings = sum(todayDeliveries.map(d => d.estimatedFee));
+
   return {
-    totalEarnings: rider.earnings,
-    totalDeliveries: rider.totalDeliveries,
     rating: rider.rating,
-    completedOrders,
-    completedDeliveries,
+    allTime: {
+      total:           allOrdersEarnings + allDeliveriesEarnings,
+      orders:          allOrdersEarnings,
+      deliveries:      allDeliveriesEarnings,
+      ordersCount:     allOrders.length,
+      deliveriesCount: allDeliveries.length,
+    },
+    today: {
+      total:           todayOrdersEarnings + todayDeliveriesEarnings,
+      orders:          todayOrdersEarnings,
+      deliveries:      todayDeliveriesEarnings,
+      ordersCount:     todayOrders.length,
+      deliveriesCount: todayDeliveries.length,
+    },
   };
 }
 

@@ -385,6 +385,7 @@ export async function updateOrderStatus(
 
     await emitOrderEvent(orderId, 'RIDER_ASSIGNED');
     await NotificationService.notifyOrderStatusChange(orderId, 'RIDER_ASSIGNED');
+    notifyRiders('delivery:taken', { orderId });
     return;
   }
 
@@ -430,6 +431,17 @@ export async function updateOrderStatus(
       },
     });
 
+     if (newStatus === 'DELIVERED' && order.riderId) {
+      await tx.rider.update({
+        where: { id: order.riderId },
+        data: {
+          totalDeliveries: { increment: 1 },
+          earnings:        { increment: order.deliveryFee ?? 0 },
+          availability:    'ONLINE',
+        },
+      });
+    }
+    
     if (newStatus === 'CANCELLED' && order.riderId) {
       await tx.rider.update({
         where: { id: order.riderId },
@@ -677,6 +689,7 @@ export async function riderAcceptOrder(orderId: string, riderUserId: string) {
         status:       'ACCEPTED',
         timestamp:    new Date(),
       });
+      notifyRiders('delivery:taken', { orderId: order.id });
     return updated;
   });
   
