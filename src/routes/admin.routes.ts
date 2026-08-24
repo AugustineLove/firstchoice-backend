@@ -11,6 +11,7 @@ adminRouter.use(authenticate, authorize('ADMIN'));
 
 // Overview
 adminRouter.get('/stats', AdminController.getOverviewStats);
+adminRouter.get('/overview', AdminController.overview);
 
 // Users
 adminRouter.get('/users', AdminController.getAllUsers);

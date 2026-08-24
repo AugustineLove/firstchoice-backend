@@ -11,10 +11,19 @@ function handleError(res: Response, err: any) {
 
 export async function getOverviewStats(req: Request, res: Response) {
   try {
-    const stats = await AdminService.getOverviewStats();
+    const stats = await AdminService.getAdminOverview();
     res.status(200).json({ success: true, data: stats });
   } catch (err: any) {
     res.status(400).json({ success: false, message: err.message });
+  }
+}
+
+export async function overview(req: Request, res: Response) {
+  try {
+    const data = await AdminService.getAdminOverview();
+    res.json({ success: true, data });
+  } catch (e: any) {
+    res.status(400).json({ success: false, message: e.message });
   }
 }
 

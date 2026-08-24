@@ -61,6 +61,159 @@ export async function getOverviewStats() {
   };
 }
 
+function startOfDay(d: Date) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
+function daysAgo(n: number) { const d = new Date(); d.setDate(d.getDate() - n); return startOfDay(d); }
+
+export async function getAdminOverview() {
+  const since30    = daysAgo(30);
+  const startToday = startOfDay(new Date());
+
+  const [
+    totalUsers, usersByRole, usersLast30,
+    totalVendors, vendorsByStatus, pendingVendors,
+    totalRiders, ridersByAvailability,
+    ordersLast30, deliveriesLast30,
+    ordersToday, deliveriesToday,
+    orderStatusCounts, deliveryStatusCounts,
+    paymentMethodCounts,
+    topVendorsRaw, topRiders,
+    allTimeRevenue,
+  ] = await Promise.all([
+    prisma.user.count(),
+    prisma.user.groupBy({ by: ['role'], _count: { id: true } }),
+    prisma.user.findMany({ where: { createdAt: { gte: since30 } }, select: { createdAt: true, role: true } }),
+
+    prisma.vendor.count(),
+    prisma.vendor.groupBy({ by: ['status'], _count: { id: true } }),
+    prisma.vendor.count({ where: { status: 'PENDING' } }),
+
+    prisma.rider.count(),
+    prisma.rider.groupBy({ by: ['availability'], _count: { id: true } }),
+
+    prisma.order.findMany({
+      where: { createdAt: { gte: since30 } },
+      select: { createdAt: true, totalAmount: true, orderStatus: true },
+    }),
+    prisma.deliveryRequest.findMany({
+      where: { createdAt: { gte: since30 } },
+      select: { createdAt: true, estimatedFee: true, status: true, type: true },
+    }),
+
+    prisma.order.count({ where: { createdAt: { gte: startToday } } }),
+    prisma.deliveryRequest.count({ where: { createdAt: { gte: startToday } } }),
+
+    prisma.order.groupBy({ by: ['orderStatus'], _count: { id: true } }),
+    prisma.deliveryRequest.groupBy({ by: ['status'], _count: { id: true } }),
+    prisma.order.groupBy({ by: ['paymentMethod'], _count: { id: true } }),
+
+    prisma.order.groupBy({
+      by: ['vendorId'], _count: { id: true }, _sum: { totalAmount: true },
+      orderBy: { _sum: { totalAmount: 'desc' } }, take: 5,
+    }),
+    prisma.rider.findMany({
+      orderBy: { earnings: 'desc' }, take: 5,
+      include: { user: { select: { name: true, phone: true } } },
+    }),
+
+    prisma.order.aggregate({ where: { orderStatus: 'DELIVERED' }, _sum: { totalAmount: true } }),
+  ]);
+
+  // ── Resolve vendor names for the leaderboard (groupBy doesn't join) ──
+  const vendorIds = topVendorsRaw.map(v => v.vendorId);
+  const vendorRecords = await prisma.vendor.findMany({
+    where: { id: { in: vendorIds } },
+    select: { id: true, businessName: true, logo: true },
+  });
+  const vendorMap = Object.fromEntries(vendorRecords.map(v => [v.id, v]));
+  const topVendors = topVendorsRaw.map(v => ({
+    vendorId: v.vendorId,
+    businessName: vendorMap[v.vendorId]?.businessName || 'Unknown',
+    logo: vendorMap[v.vendorId]?.logo || null,
+    orderCount: v._count.id,
+    revenue: v._sum.totalAmount || 0,
+  }));
+
+  // ── Daily revenue + volume trend, last 30 days ──
+  const dayMap: Record<string, { date: string; orderRevenue: number; deliveryRevenue: number; orderCount: number; deliveryCount: number }> = {};
+  for (let i = 29; i >= 0; i--) {
+    const key = daysAgo(i).toISOString().slice(0, 10);
+    dayMap[key] = { date: key, orderRevenue: 0, deliveryRevenue: 0, orderCount: 0, deliveryCount: 0 };
+  }
+  for (const o of ordersLast30) {
+    const key = startOfDay(o.createdAt).toISOString().slice(0, 10);
+    if (dayMap[key]) { dayMap[key].orderRevenue += o.totalAmount ?? 0; dayMap[key].orderCount += 1; }
+  }
+  for (const d of deliveriesLast30) {
+    const key = startOfDay(d.createdAt).toISOString().slice(0, 10);
+    if (dayMap[key]) { dayMap[key].deliveryRevenue += d.estimatedFee ?? 0; dayMap[key].deliveryCount += 1; }
+  }
+  const dailyTrend = Object.values(dayMap).map(d => ({
+    ...d, totalRevenue: d.orderRevenue + d.deliveryRevenue, totalCount: d.orderCount + d.deliveryCount,
+  }));
+
+  // ── User growth trend, last 30 days ──
+  const growthMap: Record<string, { date: string; customers: number; vendors: number; riders: number }> = {};
+  for (let i = 29; i >= 0; i--) {
+    const key = daysAgo(i).toISOString().slice(0, 10);
+    growthMap[key] = { date: key, customers: 0, vendors: 0, riders: 0 };
+  }
+  for (const u of usersLast30) {
+    const key = startOfDay(u.createdAt).toISOString().slice(0, 10);
+    if (!growthMap[key]) continue;
+    if (u.role === 'CUSTOMER') growthMap[key].customers += 1;
+    else if (u.role === 'VENDOR') growthMap[key].vendors += 1;
+    else if (u.role === 'RIDER') growthMap[key].riders += 1;
+  }
+  const userGrowth = Object.values(growthMap);
+
+  // ── Order type mix (marketplace / pickup delivery / errand), last 30 days ──
+  const orderTypeBreakdown = [
+    { type: 'Marketplace Orders', count: ordersLast30.length },
+    { type: 'Pickup Deliveries',  count: deliveriesLast30.filter(d => d.type === 'PICKUP').length },
+    { type: 'Errands',            count: deliveriesLast30.filter(d => d.type === 'ERRAND').length },
+  ];
+
+  // ── Payment method mix ──
+  const paymentMethodBreakdown = paymentMethodCounts.map(p => ({ method: p.paymentMethod, count: p._count.id }));
+
+  // ── Cancellation rate, last 30 days ──
+  const cancelledLast30 =
+    ordersLast30.filter(o => o.orderStatus === 'CANCELLED').length +
+    deliveriesLast30.filter(d => d.status === 'CANCELLED').length;
+  const totalLast30 = ordersLast30.length + deliveriesLast30.length;
+  const cancellationRate = totalLast30 > 0 ? Math.round((cancelledLast30 / totalLast30) * 1000) / 10 : 0;
+
+  const revenueToday = dailyTrend[dailyTrend.length - 1]?.totalRevenue || 0;
+
+  return {
+    kpis: {
+      totalUsers,
+      usersByRole: Object.fromEntries(usersByRole.map(u => [u.role, u._count.id])),
+      totalVendors,
+      activeVendors: vendorsByStatus.find(v => v.status === 'ACTIVE')?._count.id || 0,
+      pendingVendors,
+      totalRiders,
+      onlineRiders: ridersByAvailability.find(r => r.availability === 'ONLINE')?._count.id || 0,
+      ordersToday,
+      deliveriesToday,
+      revenueToday,
+      totalRevenueAllTime: allTimeRevenue._sum.totalAmount || 0,
+      cancellationRate,
+    },
+    dailyTrend,
+    userGrowth,
+    orderStatusBreakdown: orderStatusCounts.map(o => ({ status: o.orderStatus, count: o._count.id })),
+    deliveryStatusBreakdown: deliveryStatusCounts.map(d => ({ status: d.status, count: d._count.id })),
+    orderTypeBreakdown,
+    paymentMethodBreakdown,
+    topVendors,
+    topRiders: topRiders.map(r => ({
+      id: r.id, name: r.user.name, phone: r.user.phone,
+      earnings: r.earnings, totalDeliveries: r.totalDeliveries, rating: r.rating, availability: r.availability,
+    })),
+  };
+}
+
 // ─── USER MANAGEMENT ────────────────────────────────────
 
 export async function getAllUsers(filters: {
