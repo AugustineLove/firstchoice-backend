@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import * as AdminService from '../services/admin.service';
 import * as NotificationService from '../services/notification.service';
 import { UserStatus, VendorStatus } from '@prisma/client';
+import { getRiderInsights, getRiderJobsPaginated } from '../services/rider.service';
 
 
 function handleError(res: Response, err: any) {
@@ -189,5 +190,30 @@ export async function broadcastNotification(req: Request, res: Response) {
     return res.json({ success: true, data: result });
   } catch (err: any) {
     return res.status(500).json({ success: false, message: err.message || 'Failed to send broadcast' });
+  }
+}
+
+
+export async function riderInsights(req: Request, res: Response) {
+  try {
+    const data = await getRiderInsights(req.params.id as string);
+    res.json({ success: true, data });
+  } catch (e: any) {
+    res.status(400).json({ success: false, message: e.message });
+  }
+}
+
+export async function riderJobHistory(req: Request, res: Response) {
+  try {
+    const { page, limit, kind, status } = req.query;
+    const data = await getRiderJobsPaginated(req.params.id as string, {
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+      kind: kind as any,
+      status: status as string | undefined,
+    });
+    res.json({ success: true, data });
+  } catch (e: any) {
+    res.status(400).json({ success: false, message: e.message });
   }
 }

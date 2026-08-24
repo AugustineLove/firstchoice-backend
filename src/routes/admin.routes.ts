@@ -31,6 +31,9 @@ adminRouter.delete('/products/:productId', AdminController.deleteVendorProduct);
 adminRouter.get('/settings', getAdminSettings);
 adminRouter.patch('/settings', patchAdminSettings);
 
+adminRouter.get('/riders/:id/insights', AdminController.riderInsights);
+adminRouter.get('/riders/:id/jobs',      AdminController.riderJobHistory);
+
 // Riders
 adminRouter.get('/riders', AdminController.getAllRiders);
 
