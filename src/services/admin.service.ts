@@ -647,3 +647,127 @@ export async function deleteProductAdmin(productId: string) {
   await prisma.product.delete({ where: { id: productId } });
   return { message: 'Product deleted successfully' };
 }
+
+// ─── RIDER DAILY CASH/EARNINGS REPORT ───────────────────
+
+export async function getRiderDailyReport(filters: {
+  startDate?: string; // 'YYYY-MM-DD'
+  endDate?: string;   // 'YYYY-MM-DD'
+  riderId?: string;
+}) {
+  const start = filters.startDate ? startOfDay(new Date(filters.startDate)) : daysAgo(6);
+  const endDay = filters.endDate ? startOfDay(new Date(filters.endDate)) : startOfDay(new Date());
+  const end = new Date(endDay.getTime() + 24 * 60 * 60 * 1000 - 1); // inclusive end of day
+
+  if (end < start) throw new Error('endDate cannot be before startDate');
+
+  const [orders, deliveries] = await Promise.all([
+    prisma.order.findMany({
+      where: {
+        orderStatus: 'DELIVERED',
+        riderId: { not: null, ...(filters.riderId && { equals: filters.riderId }) },
+        updatedAt: { gte: start, lte: end },
+      },
+      select: { riderId: true, updatedAt: true, subtotal: true, deliveryFee: true, paymentMethod: true },
+    }),
+    prisma.deliveryRequest.findMany({
+      where: {
+        status: 'DELIVERED',
+        assignedRiderId: { not: null, ...(filters.riderId && { equals: filters.riderId }) },
+        updatedAt: { gte: start, lte: end },
+      },
+      select: {
+        assignedRiderId: true, updatedAt: true, itemsEstimatedTotal: true,
+        deliveryFee: true, errandFee: true, paymentMethod: true, type: true,
+      },
+    }),
+  ]);
+
+  type Row = {
+    riderId: string; date: string; jobs: number;
+    itemsSubtotal: number; deliveryFees: number;
+    cashCollected: number; momoCollected: number;
+    grandTotal: number; netToRemit: number;
+  };
+  const map: Record<string, Row> = {};
+  const ensure = (riderId: string, date: string) => {
+    const k = `${riderId}|${date}`;
+    if (!map[k]) map[k] = {
+      riderId, date, jobs: 0, itemsSubtotal: 0, deliveryFees: 0,
+      cashCollected: 0, momoCollected: 0, grandTotal: 0, netToRemit: 0,
+    };
+    return map[k];
+  };
+
+  for (const o of orders) {
+    if (!o.riderId) continue;
+    const date = startOfDay(o.updatedAt).toISOString().slice(0, 10);
+    const row = ensure(o.riderId, date);
+    const items = o.subtotal || 0;
+    const fee = o.deliveryFee || 0;
+    row.jobs += 1;
+    row.itemsSubtotal += items;
+    row.deliveryFees += fee;
+    row.grandTotal += items + fee;
+    if (o.paymentMethod === 'CASH') row.cashCollected += items + fee;
+    else row.momoCollected += items + fee;
+  }
+
+  for (const d of deliveries) {
+    if (!d.assignedRiderId) continue;
+    const date = startOfDay(d.updatedAt).toISOString().slice(0, 10);
+    const row = ensure(d.assignedRiderId, date);
+    const items = d.itemsEstimatedTotal || 0;
+    const fee = (d.deliveryFee || 0) + (d.errandFee || 0);
+    row.jobs += 1;
+    row.itemsSubtotal += items;
+    row.deliveryFees += fee;
+    row.grandTotal += items + fee;
+    if (d.paymentMethod === 'CASH') row.cashCollected += items + fee;
+    else row.momoCollected += items + fee;
+  }
+
+  for (const row of Object.values(map)) row.netToRemit = row.cashCollected - row.deliveryFees;
+
+  const riderIds = [...new Set(Object.values(map).map(r => r.riderId))];
+  const riders = await prisma.rider.findMany({
+    where: { id: { in: riderIds } },
+    include: { user: { select: { name: true, phone: true } } },
+  });
+  const riderMap = Object.fromEntries(riders.map(r => [r.id, r]));
+
+  const rows = Object.values(map)
+    .map(r => ({
+      ...r,
+      riderName: riderMap[r.riderId]?.user.name || 'Unknown',
+      riderPhone: riderMap[r.riderId]?.user.phone || '',
+    }))
+    .sort((a, b) => b.date.localeCompare(a.date) || a.riderName.localeCompare(b.riderName));
+
+  // Same-shape totals, grouped by date only (for the per-day summary strip)
+  const dailyMap: Record<string, Omit<Row, 'riderId'>> = {};
+  for (const r of rows) {
+    if (!dailyMap[r.date]) dailyMap[r.date] = {
+      date: r.date, jobs: 0, itemsSubtotal: 0, deliveryFees: 0,
+      cashCollected: 0, momoCollected: 0, grandTotal: 0, netToRemit: 0,
+    };
+    const t = dailyMap[r.date];
+    t.jobs += r.jobs; t.itemsSubtotal += r.itemsSubtotal; t.deliveryFees += r.deliveryFees;
+    t.cashCollected += r.cashCollected; t.momoCollected += r.momoCollected;
+    t.grandTotal += r.grandTotal; t.netToRemit += r.netToRemit;
+  }
+  const dailyTotals = Object.values(dailyMap).sort((a, b) => b.date.localeCompare(a.date));
+
+  // Grand totals across the whole range, for header cards
+  const overall = dailyTotals.reduce((acc, d) => ({
+    jobs: acc.jobs + d.jobs,
+    itemsSubtotal: acc.itemsSubtotal + d.itemsSubtotal,
+    deliveryFees: acc.deliveryFees + d.deliveryFees,
+    cashCollected: acc.cashCollected + d.cashCollected,
+    momoCollected: acc.momoCollected + d.momoCollected,
+    grandTotal: acc.grandTotal + d.grandTotal,
+    netToRemit: acc.netToRemit + d.netToRemit,
+  }), { jobs: 0, itemsSubtotal: 0, deliveryFees: 0, cashCollected: 0, momoCollected: 0, grandTotal: 0, netToRemit: 0 });
+
+  return { rows, dailyTotals, overall, range: { start: start.toISOString(), end: end.toISOString() } };
+}

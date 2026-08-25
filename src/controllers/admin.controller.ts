@@ -226,3 +226,17 @@ export async function riderJobHistory(req: Request, res: Response) {
     res.status(400).json({ success: false, message: e.message });
   }
 }
+
+export async function riderDailyReport(req: Request, res: Response) {
+  try {
+    const { startDate, endDate, riderId } = req.query;
+    const data = await AdminService.getRiderDailyReport({
+      startDate: startDate as string | undefined,
+      endDate: endDate as string | undefined,
+      riderId: riderId as string | undefined,
+    });
+    res.json({ success: true, data });
+  } catch (e: any) {
+    res.status(400).json({ success: false, message: e.message || 'Could not load report' });
+  }
+}

@@ -48,9 +48,12 @@ adminRouter.get('/analytics/riders', AdminController.getRiderAnalytics);
 // Broadcast notifications
 adminRouter.post('/broadcast', AdminController.broadcastNotification);
 
-
+// Operating hours and override
 adminRouter.patch('/operating-hours', authorize('ADMIN'), SettingsController.updateOperatingHours);
 adminRouter.post('/operating-override', authorize('ADMIN'), SettingsController.setOperatingOverride);
 adminRouter.delete('/operating-override', authorize('ADMIN'), SettingsController.clearOperatingOverride);
+
+// Report generation
+adminRouter.get('/reports/riders/daily', AdminController.riderDailyReport);
 
 export default adminRouter;
