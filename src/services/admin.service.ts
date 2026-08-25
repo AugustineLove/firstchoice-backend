@@ -75,9 +75,8 @@ export async function getAdminOverview() {
     ordersLast30, deliveriesLast30,
     ordersToday, deliveriesToday,
     orderStatusCounts, deliveryStatusCounts,
-    paymentMethodCounts,
-    topVendorsRaw, topRiders,
-    allTimeRevenue,
+    topVendorsRaw,
+    allTimeOrderRevenue, allTimeDeliveryRevenue,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.user.groupBy({ by: ['role'], _count: { id: true } }),
@@ -104,18 +103,18 @@ export async function getAdminOverview() {
 
     prisma.order.groupBy({ by: ['orderStatus'], _count: { id: true } }),
     prisma.deliveryRequest.groupBy({ by: ['status'], _count: { id: true } }),
-    prisma.order.groupBy({ by: ['paymentMethod'], _count: { id: true } }),
 
     prisma.order.groupBy({
-      by: ['vendorId'], _count: { id: true }, _sum: { totalAmount: true },
-      orderBy: { _sum: { totalAmount: 'desc' } }, take: 5,
-    }),
-    prisma.rider.findMany({
-      orderBy: { earnings: 'desc' }, take: 5,
-      include: { user: { select: { name: true, phone: true } } },
+      by: ['vendorId'],
+      where: { orderStatus: 'DELIVERED' },
+      _count: { id: true },
+      _sum: { totalAmount: true },
+      orderBy: { _sum: { totalAmount: 'desc' } },
+      take: 5,
     }),
 
-    prisma.order.aggregate({ where: { orderStatus: 'DELIVERED' }, _sum: { totalAmount: true } }),
+    prisma.order.aggregate({ where: { orderStatus: 'DELIVERED' }, _sum: { deliveryFee: true } }),
+    prisma.deliveryRequest.aggregate({ where: { status: 'DELIVERED' }, _sum: { estimatedFee: true } }),
   ]);
 
   // ── Resolve vendor names for the leaderboard (groupBy doesn't join) ──
@@ -141,11 +140,19 @@ export async function getAdminOverview() {
   }
   for (const o of ordersLast30) {
     const key = startOfDay(o.createdAt).toISOString().slice(0, 10);
-    if (dayMap[key]) { dayMap[key].orderRevenue += o.totalAmount ?? 0; dayMap[key].orderCount += 1; }
+    if (!dayMap[key]) continue;
+    dayMap[key].orderCount += 1;
+    if (o.orderStatus === 'DELIVERED') {
+      dayMap[key].orderRevenue += o.totalAmount ?? 0;
+    }
   }
   for (const d of deliveriesLast30) {
     const key = startOfDay(d.createdAt).toISOString().slice(0, 10);
-    if (dayMap[key]) { dayMap[key].deliveryRevenue += d.estimatedFee ?? 0; dayMap[key].deliveryCount += 1; }
+    if (!dayMap[key]) continue;
+    dayMap[key].deliveryCount += 1;
+    if (d.status === 'DELIVERED') {
+      dayMap[key].deliveryRevenue += d.estimatedFee ?? 0;
+    }
   }
   const dailyTrend = Object.values(dayMap).map(d => ({
     ...d, totalRevenue: d.orderRevenue + d.deliveryRevenue, totalCount: d.orderCount + d.deliveryCount,
@@ -173,8 +180,15 @@ export async function getAdminOverview() {
     { type: 'Errands',            count: deliveriesLast30.filter(d => d.type === 'ERRAND').length },
   ];
 
-  // ── Payment method mix ──
-  const paymentMethodBreakdown = paymentMethodCounts.map(p => ({ method: p.paymentMethod, count: p._count.id }));
+  // ── Payment method mix (orders + deliveries combined) ──
+  const [orderPaymentCounts, deliveryPaymentCounts] = await Promise.all([
+    prisma.order.groupBy({ by: ['paymentMethod'], _count: { id: true } }),
+    prisma.deliveryRequest.groupBy({ by: ['paymentMethod'], _count: { id: true } }),
+  ]);
+  const paymentTotals: Record<string, number> = {};
+  for (const p of orderPaymentCounts) paymentTotals[p.paymentMethod] = (paymentTotals[p.paymentMethod] || 0) + p._count.id;
+  for (const p of deliveryPaymentCounts) paymentTotals[p.paymentMethod] = (paymentTotals[p.paymentMethod] || 0) + p._count.id;
+  const paymentMethodBreakdown = Object.entries(paymentTotals).map(([method, count]) => ({ method, count }));
 
   // ── Cancellation rate, last 30 days ──
   const cancelledLast30 =
@@ -185,6 +199,80 @@ export async function getAdminOverview() {
 
   const revenueToday = dailyTrend[dailyTrend.length - 1]?.totalRevenue || 0;
 
+  const [orderEarningsAgg, deliveryEarningsAgg, orderJobCounts, deliveryJobCounts] = await Promise.all([
+    prisma.order.groupBy({
+      by: ['riderId'],
+      where: { riderId: { not: null }, orderStatus: 'DELIVERED' },
+      _sum: { deliveryFee: true },
+      _count: { id: true },
+    }),
+    prisma.deliveryRequest.groupBy({
+      by: ['assignedRiderId'],
+      where: { assignedRiderId: { not: null }, status: 'DELIVERED' },
+      _sum: { estimatedFee: true },
+      _count: { id: true },
+    }),
+    prisma.order.groupBy({
+      by: ['riderId'],
+      where: { riderId: { not: null } },
+      _count: { id: true },
+    }),
+    prisma.deliveryRequest.groupBy({
+      by: ['assignedRiderId'],
+      where: { assignedRiderId: { not: null } },
+      _count: { id: true },
+    }),
+  ]);
+
+  const riderStats: Record<string, { earnings: number; completedJobs: number; totalJobs: number }> = {};
+  const ensure = (id: string) => (riderStats[id] ??= { earnings: 0, completedJobs: 0, totalJobs: 0 });
+
+  for (const o of orderEarningsAgg) {
+    if (!o.riderId) continue;
+    const s = ensure(o.riderId);
+    s.earnings += o._sum.deliveryFee || 0;
+    s.completedJobs += o._count.id;
+  }
+  for (const d of deliveryEarningsAgg) {
+    if (!d.assignedRiderId) continue;
+    const s = ensure(d.assignedRiderId);
+    s.earnings += d._sum.estimatedFee || 0;
+    s.completedJobs += d._count.id;
+  }
+  for (const o of orderJobCounts) {
+    if (!o.riderId) continue;
+    ensure(o.riderId).totalJobs += o._count.id;
+  }
+  for (const d of deliveryJobCounts) {
+    if (!d.assignedRiderId) continue;
+    ensure(d.assignedRiderId).totalJobs += d._count.id;
+  }
+
+  const rankedRiderIds = Object.entries(riderStats)
+    .sort((a, b) => b[1].earnings - a[1].earnings)
+    .slice(0, 5)
+    .map(([id]) => id);
+
+  const riderRecords = await prisma.rider.findMany({
+    where: { id: { in: rankedRiderIds } },
+    include: { user: { select: { name: true, phone: true } } },
+  });
+  const riderRecordMap = Object.fromEntries(riderRecords.map(r => [r.id, r]));
+
+  const topRiders = rankedRiderIds.map(id => {
+    const r = riderRecordMap[id];
+    const s = riderStats[id];
+    return {
+      id,
+      name: r?.user.name || 'Unknown',
+      phone: r?.user.phone || '',
+      rating: r?.rating || 0,
+      availability: r?.availability || 'OFFLINE',
+      totalEarnings: s.earnings,       // orders' deliveryFee + deliveries' estimatedFee, delivered only
+      totalJobs: s.totalJobs,          // every order/delivery ever assigned, any status
+      completedJobs: s.completedJobs,  // delivered only
+    };
+  });
   return {
     kpis: {
       totalUsers,
@@ -197,7 +285,7 @@ export async function getAdminOverview() {
       ordersToday,
       deliveriesToday,
       revenueToday,
-      totalRevenueAllTime: allTimeRevenue._sum.totalAmount || 0,
+      totalRevenueAllTime: (allTimeOrderRevenue._sum.deliveryFee || 0) + (allTimeDeliveryRevenue._sum.estimatedFee || 0),
       cancellationRate,
     },
     dailyTrend,
@@ -207,13 +295,9 @@ export async function getAdminOverview() {
     orderTypeBreakdown,
     paymentMethodBreakdown,
     topVendors,
-    topRiders: topRiders.map(r => ({
-      id: r.id, name: r.user.name, phone: r.user.phone,
-      earnings: r.earnings, totalDeliveries: r.totalDeliveries, rating: r.rating, availability: r.availability,
-    })),
+    topRiders
   };
 }
-
 // ─── USER MANAGEMENT ────────────────────────────────────
 
 export async function getAllUsers(filters: {
