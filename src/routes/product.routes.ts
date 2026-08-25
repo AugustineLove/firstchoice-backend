@@ -26,21 +26,21 @@ productRouter.post(
 productRouter.get(
   '/me/all',
   authenticate,
-  authorize('VENDOR'),
+  authorize('VENDOR', 'ADMIN'),
   ProductController.getMyProducts
 );
 
 productRouter.patch(
   '/:id',
   authenticate,
-  authorize('VENDOR'),
+  authorize('VENDOR', 'ADMIN'),
   ProductController.updateProduct
 );
 
 productRouter.delete(
   '/:id',
   authenticate,
-  authorize('VENDOR'),
+  authorize('VENDOR', 'ADMIN'),
   ProductController.deleteProduct
 );
 
