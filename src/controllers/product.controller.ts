@@ -18,10 +18,22 @@ export async function createProduct(req: AuthRequest, res: Response) {
 
 export async function updateProduct(req: AuthRequest, res: Response) {
   try {
-    const product = await ProductService.updateProduct(req.user!.id, req.params.id as string, req.body);
+    const product = await ProductService.updateProduct(
+      req.user!.id,
+      req.params.id as string,
+      req.body
+    );
+
     res.status(200).json({ success: true, data: product });
   } catch (err: any) {
-    res.status(400).json({ success: false, message: err.message });
+    console.error("UPDATE PRODUCT ERROR:", err);
+    console.error("MESSAGE:", err?.message);
+    console.error("STACK:", err?.stack);
+
+    res.status(500).json({
+      success: false,
+      message: err?.message || "Failed to update product",
+    });
   }
 }
 
