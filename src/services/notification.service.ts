@@ -169,15 +169,16 @@ export async function notifyOrderStatusChange(
   if (!order) return;
 
   const STATUS_MESSAGES: Record<string, { title: string; body: string }> = {
-    ACCEPTED:         { title: '✅ Order Accepted', body: `${order.vendor.businessName} accepted your order!` },
-    PREPARING:        { title: '👨‍🍳 Being Prepared', body: `${order.vendor.businessName} is preparing your order.` },
-    READY_FOR_PICKUP: { title: '📦 Ready for Pickup', body: 'Your order is ready and waiting for a rider.' },
-    RIDER_ASSIGNED:   { title: '🛵 Rider Assigned', body: `${order.rider?.user.name ?? 'A rider'} is coming to pick up your order!` },
-    PICKED_UP:        { title: '🛵 Order Picked Up', body: 'Your order has been picked up and is on the way!' },
-    IN_TRANSIT:      { title: '🛵 Order Coming To You', body: 'Your order is on the way to you.'},
-    DELIVERED:        { title: '🎉 Order Delivered!', body: `Your order from ${order.vendor.businessName} has been delivered. Enjoy!` },
-    CANCELLED:        { title: '❌ Order Cancelled', body: `Your order from ${order.vendor.businessName} was cancelled.` },
-  };
+  ACCEPTED:         { title: '✅ Order Accepted', body: `${order.vendor.businessName} accepted your order!` },
+  PREPARING:        { title: '👨‍🍳 Being Prepared', body: `${order.vendor.businessName} is preparing your order.` },
+  READY_FOR_PICKUP: { title: '📦 Ready for Pickup', body: 'Your order is ready and waiting for a rider.' },
+  RIDER_ASSIGNED:   { title: '🛵 Rider Assigned', body: `${order.rider?.user.name ?? 'A rider'} is coming to pick up your order!` },
+  PICKED_UP:        { title: '🛵 Order Picked Up', body: 'Your order has been picked up and is on the way!' },
+  IN_TRANSIT:      { title: '🛵 Order Coming To You', body: 'Your order is on the way to you.'},
+  ARRIVED:          { title: '📍 Rider Has Arrived', body: 'Your rider is outside — please come collect your order!' }, // ← new
+  DELIVERED:        { title: '🎉 Order Delivered!', body: `Your order from ${order.vendor.businessName} has been delivered. Enjoy!` },
+  CANCELLED:        { title: '❌ Order Cancelled', body: `Your order from ${order.vendor.businessName} was cancelled.` },
+};
 
   const msg = STATUS_MESSAGES[newStatus];
   if (!msg) return;
@@ -204,19 +205,20 @@ export async function notifyOrderStatusChange(
   // );
 
   // → Vendor gets notified on rider assignment, pickup, delivery, cancel
-  if (['RIDER_ASSIGNED', 'PICKED_UP', 'IN_TRANSIT', 'DELIVERED', 'CANCELLED'].includes(newStatus)) {
-    const vendorMessages: Record<string, { title: string; body: string }> = {
-      RIDER_ASSIGNED: { title: '🛵 Rider On The Way', body: `${order.rider?.user.name} is heading to pick up order #${orderId.slice(-6).toUpperCase()}` },
-      PICKED_UP:      { title: '✅ Order Picked Up', body: `Order #${orderId.slice(-6).toUpperCase()} has been picked up.` },
-      IN_TRANSIT:      { title: '✅ Order Coming To You', body: `Order #${orderId.slice(-6).toUpperCase()} has been picked up and is on the way to you.` },
-      DELIVERED:      { title: '🎉 Order Delivered', body: `Order #${orderId.slice(-6).toUpperCase()} was delivered successfully!` },
-      CANCELLED:      { title: '❌ Order Cancelled', body: `Order #${orderId.slice(-6).toUpperCase()} was cancelled.` },
-    };
-    const vendorMsg = vendorMessages[newStatus];
-    if (vendorMsg) {
-      await sendToUser(order.vendor.user.id, { ...vendorMsg, data: { ...baseData, screen: 'vendor_orders' } });
-    }
+  if (['RIDER_ASSIGNED', 'PICKED_UP', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED', 'CANCELLED'].includes(newStatus)) {
+  const vendorMessages: Record<string, { title: string; body: string }> = {
+    RIDER_ASSIGNED: { title: '🛵 Rider On The Way', body: `${order.rider?.user.name} is heading to pick up order #${orderId.slice(-6).toUpperCase()}` },
+    PICKED_UP:      { title: '✅ Order Picked Up', body: `Order #${orderId.slice(-6).toUpperCase()} has been picked up.` },
+    IN_TRANSIT:      { title: '✅ Order Coming To You', body: `Order #${orderId.slice(-6).toUpperCase()} has been picked up and is on the way to you.` },
+    ARRIVED:         { title: '📍 Rider Arrived', body: `Rider has arrived with order #${orderId.slice(-6).toUpperCase()}.` }, // ← new
+    DELIVERED:      { title: '🎉 Order Delivered', body: `Order #${orderId.slice(-6).toUpperCase()} was delivered successfully!` },
+    CANCELLED:      { title: '❌ Order Cancelled', body: `Order #${orderId.slice(-6).toUpperCase()} was cancelled.` },
+  };
+  const vendorMsg = vendorMessages[newStatus];
+  if (vendorMsg) {
+    await sendToUser(order.vendor.user.id, { ...vendorMsg, data: { ...baseData, screen: 'vendor_orders' } });
   }
+}
 
   // → Rider gets notified when assigned
   if (newStatus === 'RIDER_ASSIGNED' && order.rider) {

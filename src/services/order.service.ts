@@ -269,6 +269,7 @@ console.log(`Sub total: ${data.subtotal}`);
        orderStatus: 'PENDING',
     },
     include: {
+      customer: { select: { id: true, name: true, phone: true } },
       vendor: { select: { businessName: true, logo: true, phone: true } },
     },
   });
@@ -337,8 +338,9 @@ export async function getOrderById(orderId: string, userId: string) {
 const validTransitions: Record<OrderStatus, OrderStatus[]> = {
   PENDING:         ['RIDER_ASSIGNED', 'CANCELLED'],
   RIDER_ASSIGNED:  ['PICKED_UP', 'CANCELLED'],
-  PICKED_UP:       ['IN_TRANSIT', 'CANCELLED'],   // ← added
-  IN_TRANSIT:      ['DELIVERED'],
+  PICKED_UP:       ['IN_TRANSIT', 'CANCELLED'],  
+  IN_TRANSIT:      ['ARRIVED'],       // ← was ['DELIVERED']
+  ARRIVED:         ['DELIVERED'],
   DELIVERED:       [],
   CANCELLED:       [],
   ACCEPTED:        [],
@@ -362,7 +364,7 @@ export async function updateOrderStatus(
   const rider = await prisma.rider.findUnique({ where: { userId } });
 
   // Role-based permission checks
-  if (newStatus === 'PICKED_UP' || newStatus === 'DELIVERED') {
+  if (newStatus === 'PICKED_UP' || newStatus === 'DELIVERED' || newStatus === 'ARRIVED') {
     if (rider?.id !== order.riderId)
       throw new Error('Only the assigned rider can update to this status');
   }
@@ -512,7 +514,7 @@ export async function getAllOrders(filters: {
       },
 
       include: {
-        // This is actually the User who placed the order
+        // Customer
         customer: {
           select: {
             id: true,

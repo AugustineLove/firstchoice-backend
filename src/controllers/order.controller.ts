@@ -95,7 +95,6 @@ export async function getAllOrders(req: Request, res: Response) {
       page: page ? parseInt(page as string) : 1,
       limit: limit ? parseInt(limit as string) : 20,
     });
-    console.log(`All orders: ${JSON.stringify(result)}`)
     res.status(200).json({ success: true, data: result });
   } catch (err: any) {
     res.status(400).json({ success: false, message: err.message });

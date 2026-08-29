@@ -33,13 +33,13 @@ enum VendorStatus {
   INACTIVE
   PENDING
 }
-
 enum OrderStatus {
   PENDING
   ACCEPTED
   RIDER_ASSIGNED
   PICKED_UP
   IN_TRANSIT
+  ARRIVED 
   DELIVERED
   CANCELLED
 }
