@@ -1,5 +1,6 @@
 import { prisma } from '../config/prisma';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto'; // add to top of file
 
 const PHONE_REGEX = /^(0|\+233)\d{9}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -157,4 +158,43 @@ export async function getUserErrands(id: string) {
     where: { customerId: id },
     orderBy: { createdAt: 'desc' },
   });
+}
+
+export async function deleteAccount(id: string, password: string) {
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) throw new Error('User not found');
+
+  const isMatch = await bcrypt.compare(password, user.passwordHash);
+  if (!isMatch) throw new Error('Password is incorrect');
+
+  // A hard delete would violate FK constraints on Order/DeliveryRequest/
+  // Errand/VendorRating/ProductReview, and would destroy order records
+  // you need for accounting/disputes. Instead: wipe PII, permanently
+  // block login (random unusable password + DELETED status), and free
+  // up the phone/email so the person can sign up fresh if they want.
+  const anonymizedPhone = `deleted_${id}`;
+  const randomPassword = crypto.randomBytes(32).toString('hex');
+  const passwordHash = await bcrypt.hash(randomPassword, 10);
+
+  await prisma.user.update({
+    where: { id },
+    data: {
+      name: 'Deleted User',
+      phone: anonymizedPhone,
+      email: null,
+      profileImage: null,
+      passwordHash,
+      status: 'DELETED',
+      fcmToken: null,
+      webFcmToken: null,
+      resetPasswordToken: null,
+      resetPasswordExpiry: null,
+      firebaseUid: null,
+      telegramChatId: null,
+      telegramLinkCode: null,
+      telegramLinkCodeExpiry: null,
+    },
+  });
+
+  return { message: 'Account deleted successfully' };
 }

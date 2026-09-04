@@ -84,3 +84,14 @@ export async function getMyErrands(req: AuthRequest, res: Response) {
     res.status(400).json({ success: false, message: err.message });
   }
 }
+
+export async function deleteAccountHandler(req: AuthRequest, res: Response) {
+  try {
+    const { password } = req.body;
+    if (!password) return res.status(400).json({ message: 'Password is required to delete your account' });
+    const result = await UserService.deleteAccount(req.user!.id, password);
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ message: err.message });
+  }
+}

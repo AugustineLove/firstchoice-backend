@@ -86,4 +86,6 @@ userRouter.get('/me/orders', UserController.getMyOrders);
 userRouter.get('/me/deliveries', UserController.getMyDeliveries);
 userRouter.get('/me/errands', UserController.getMyErrands);
 
+
+userRouter.delete('/me', authenticate, UserController.deleteAccountHandler);
 export default userRouter;

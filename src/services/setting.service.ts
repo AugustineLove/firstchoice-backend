@@ -46,6 +46,8 @@ export async function updateSettings(data: Partial<{
   errandFixedPrice: number;
   errandPerItemPrice: number;
   errandPickupLocationId: string | null;
+  isClosed: boolean;
+  closedMessage: string | null;
 }>) {
   await getSettings(); // ensures the row exists before update
   const updated = await prisma.settings.update({
@@ -95,6 +97,18 @@ export async function updateOperatingHours(hours: Record<string, TimeWindow[]>) 
 export async function getOperatingStatus() {
   const settings = await getSettings();
 
+  // Check if manually closed
+  if (settings.isClosed) {
+    return {
+      open: false,
+      overrideActive: false,
+      overrideExpiresAt: null,
+      hours: settings.operatingHours || DEFAULT_OPERATING_HOURS,
+      isClosed: true,
+      closedMessage: settings.closedMessage || 'We are currently not accepting orders. Please check back later.',
+    };
+  }
+
   if (settings.overrideActive) {
     const expired = settings.overrideExpiresAt && settings.overrideExpiresAt.getTime() <= Date.now();
     if (expired) {
@@ -109,6 +123,8 @@ export async function getOperatingStatus() {
         overrideActive: true,
         overrideExpiresAt: settings.overrideExpiresAt,
         hours: settings.operatingHours || DEFAULT_OPERATING_HOURS,
+        isClosed: false,
+        closedMessage: null,
       };
     }
   }
@@ -116,7 +132,15 @@ export async function getOperatingStatus() {
   const hours = (settings.operatingHours as Record<string, TimeWindow[]>) || DEFAULT_OPERATING_HOURS;
   const { open, nextWindow } = isWithinOperatingHours(hours);
 
-  return { open, overrideActive: false, overrideExpiresAt: null, nextWindow, hours };
+  return { 
+    open, 
+    overrideActive: false, 
+    overrideExpiresAt: null, 
+    nextWindow, 
+    hours,
+    isClosed: false,
+    closedMessage: null,
+  };
 }
 
 export async function setOperatingOverride(durationMinutes: number) {
@@ -136,6 +160,23 @@ export async function clearOperatingOverride() {
   const updated = await prisma.settings.update({
     where: { id: SETTINGS_ID },
     data: { overrideActive: false, overrideExpiresAt: null },
+  });
+  invalidateSettingsCache();
+  return updated;
+}
+
+// ─── CLOSING MESSAGE ──────────────────────────────────────
+
+export async function updateClosingStatus(isClosed: boolean, closedMessage: string | null) {
+  const data: any = { isClosed };
+  if (isClosed && closedMessage) {
+    data.closedMessage = closedMessage;
+  } else if (!isClosed) {
+    data.closedMessage = null;
+  }
+  const updated = await prisma.settings.update({
+    where: { id: SETTINGS_ID },
+    data,
   });
   invalidateSettingsCache();
   return updated;

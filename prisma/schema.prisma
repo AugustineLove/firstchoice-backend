@@ -20,6 +20,7 @@ enum UserStatus {
   ACTIVE
   SUSPENDED
   PENDING
+  DELETED
 }
 
 enum RiderAvailability {
@@ -389,7 +390,10 @@ model Settings {
   operatingHours          Json?             // { "0": [{start,end}], "1": [...], ... } — null = use defaults
   overrideActive          Boolean           @default(false)
   overrideExpiresAt       DateTime?         // when the manual "accept orders anyway" window ends
-
+  
+  isClosed                Boolean           @default(false)
+  closedMessage           String?           
+  
   updatedAt               DateTime          @updatedAt
 }
 

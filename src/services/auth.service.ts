@@ -85,19 +85,12 @@ export async function registerUser(data: {
   return { user, ...tokens };
 }
 
-export async function loginUser(data: {
-  phone: string;
-  password: string;
-}) {
-  console.log(data);
-  const rawUser = await prisma.user.findUnique({
-    where: { phone: data.phone },
-  });
+export async function loginUser(data: { phone: string; password: string }) {
+  const rawUser = await prisma.user.findUnique({ where: { phone: data.phone } });
 
   if (!rawUser) throw new Error('Invalid phone number or password');
-
-  if (rawUser.status === 'SUSPENDED')
-    throw new Error('Your account has been suspended');
+  if (rawUser.status === 'SUSPENDED') throw new Error('Your account has been suspended');
+  if (rawUser.status === 'DELETED') throw new Error('Invalid phone number or password'); // don't reveal it existed
 
   const isMatch = await bcrypt.compare(data.password, rawUser.passwordHash);
   if (!isMatch) throw new Error('Invalid phone number or password');
@@ -117,6 +110,7 @@ export async function refreshAccessToken(token: string) {
     const user = await prisma.user.findUnique({ where: { id: payload.id } });
     if (!user) throw new Error('User not found');
     if (user.status === 'SUSPENDED') throw new Error('Account suspended');
+    if (user.status === 'DELETED') throw new Error('Account no longer exists');
 
     const accessToken = jwt.sign(
       { id: user.id, role: user.role },

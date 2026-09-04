@@ -3,6 +3,7 @@ import * as AdminController from '../controllers/admin.controller';
 import * as SettingsController from '../controllers/settings.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { getAdminSettings, patchAdminSettings } from '../controllers/settings.controller';
+import { updateClosingStatus } from '../services/setting.service';
 
 const adminRouter = Router();
 
@@ -47,6 +48,51 @@ adminRouter.get('/analytics/riders', AdminController.getRiderAnalytics);
 
 // Broadcast notifications
 adminRouter.post('/broadcast', AdminController.broadcastNotification);
+
+adminRouter.patch('/admin/closing-status', 
+  authenticate, 
+  authorize('ADMIN'), 
+  async (req, res) => {
+    try {
+      const { isClosed, closedMessage } = req.body;
+      
+      if (typeof isClosed !== 'boolean') {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'isClosed must be a boolean' 
+        });
+      }
+      
+      if (isClosed && typeof closedMessage !== 'string') {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'closedMessage is required when closing' 
+        });
+      }
+      
+      if (isClosed && closedMessage && closedMessage.length > 500) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Message cannot exceed 500 characters' 
+        });
+      }
+      
+      const settings = await updateClosingStatus(isClosed, closedMessage);
+      res.json({ 
+        success: true, 
+        data: {
+          isClosed: settings.isClosed,
+          closedMessage: settings.closedMessage,
+        }
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        success: false, 
+        message: error 
+      });
+    }
+  }
+);
 
 // Operating hours and override
 adminRouter.patch('/operating-hours', authorize('ADMIN'), SettingsController.updateOperatingHours);
