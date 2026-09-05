@@ -1,8 +1,9 @@
 import * as NotificationService from './notification.service';
-import { UserStatus, VendorStatus } from '@prisma/client';
+import { OrderStatus, UserStatus, VendorStatus } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { notifyRiders, notifyUser } from '../socket/socket.manager';
 // ─── OVERVIEW STATS ─────────────────────────────────────
 
 export async function getOverviewStats() {
@@ -458,40 +459,85 @@ export async function getAllRidersAdmin(filters: {
 // ─── ORDER ASSIGNMENT ───────────────────────────────────
 
 export async function assignRiderToOrder(orderId: string, riderId: string) {
-  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { rider: { select: { userId: true } } },
+  });
   if (!order) throw new Error('Order not found');
-  if (order.orderStatus !== 'PENDING')
-    throw new Error('Order must be  before assigning a rider');
+
+  // Any order still "in flight" can have a rider (re)assigned.
+  // Once it's DELIVERED or CANCELLED, it's locked.
+  const assignableStatuses: OrderStatus[] = ['PENDING', 'RIDER_ASSIGNED', 'PICKED_UP', 'IN_TRANSIT', 'ARRIVED'];
+  if (!assignableStatuses.includes(order.orderStatus))
+    throw new Error(`Cannot assign a rider to an order that is ${order.orderStatus}`);
+
+  const previousRiderId = order.riderId;
+  const previousRiderUserId = order.rider?.userId;
+  const isReassignment = !!previousRiderId;
+
+  if (isReassignment && previousRiderId === riderId)
+    throw new Error('Order is already assigned to this rider');
 
   const rider = await prisma.rider.findUnique({ where: { id: riderId } });
   if (!rider) throw new Error('Rider not found');
   if (rider.availability !== 'ONLINE')
     throw new Error('Rider is not available');
 
-  return prisma.$transaction(async (tx) => {
-    const updated = await tx.order.update({
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.order.update({
       where: { id: orderId },
       data: {
         riderId,
-        orderStatus: 'RIDER_ASSIGNED',
+        // Only bump status on the FIRST assignment. Reassigning mid-delivery
+        // (e.g. rider went offline after pickup) should leave orderStatus alone.
+        ...(isReassignment ? {} : { orderStatus: 'RIDER_ASSIGNED' }),
       },
       include: {
-        customer: { select: { name: true, phone: true } },
+        customer: { select: { id: true, name: true, phone: true } },
         vendor: { select: { businessName: true, address: true } },
-        rider: {
-          include: { user: { select: { name: true, phone: true } } },
-        },
+        rider: { include: { user: { select: { name: true, phone: true } } } },
         items: { include: { product: { select: { name: true } } } },
       },
     });
 
+    // Free the previous rider back up
+    if (isReassignment && previousRiderId) {
+      await tx.rider.update({
+        where: { id: previousRiderId },
+        data: { availability: 'ONLINE' },
+      });
+    }
+
+    // Lock in the new one
     await tx.rider.update({
       where: { id: riderId },
       data: { availability: 'BUSY' },
     });
 
-    return updated;
+    return result;
   });
+
+  // ── Notifications ──
+  notifyUser(updated.customerId, 'delivery:rider_assigned', {
+    orderId,
+    riderName: updated.rider?.user?.name,
+    riderPhone: updated.rider?.user?.phone,
+    reassigned: isReassignment,
+    timestamp: new Date(),
+  });
+
+  if (isReassignment && previousRiderUserId) {
+    notifyUser(previousRiderUserId, 'delivery:unassigned', {
+      orderId,
+      reason: 'Reassigned by admin',
+      timestamp: new Date(),
+    });
+  }
+
+  // Tell the rider pool this order is spoken for (in case it was ever broadcast)
+  notifyRiders('delivery:taken', { orderId });
+
+  return updated;
 }
 
 // ─── PLATFORM ANALYTICS ─────────────────────────────────
