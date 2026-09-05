@@ -222,7 +222,7 @@ console.log(`Sub total: ${data.subtotal}`);
     sendCustomerMessage({
       messageTo: LOGISTICS_MANAGER_NUMBERS,
       messageFrom: 'FirstChoice',
-      message: `New order placed: ${order.vendor.businessName} → ${order.deliveryAddress}.\nDelivery Fee: GHS ${order.deliveryFee?.toFixed(2)}\nTotal: GHS ${order.totalAmount?.toFixed(2)}.`,
+      message: `New order placed by ${order.customer.name} at: ${order.vendor.businessName} to ${order.deliveryAddress}.\nCustomer phone: ${order.customer.phone}\nDelivery Fee: GHS ${order.deliveryFee?.toFixed(2)}\nTotal: GHS ${order.totalAmount?.toFixed(2)}.`,
     });
       notifyRiders('delivery:new_request', order);
     await NotificationService.notifyNewOrder(order.id);
