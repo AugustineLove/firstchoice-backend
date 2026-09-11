@@ -94,13 +94,29 @@ export async function resetPassword(req: Request, res: Response) {
 
 export async function resetPasswordEmail(req: Request, res: Response) {
   const error = validateResetPassword(req.body);
-  console.log(`Error: ${error}`)
-  if (error) { res.status(400).json({ success: false, message: error }); return; }
+
+  console.log(`Error: ${error}`);
+
+  if (error) {
+    res.status(400).json({
+      success: false,
+      message: error,
+    });
+    return;
+  }
+
   try {
-    await AuthService.resetPasswordEmail(req.body.phone);
-    res.status(200).json({ success: true, message: 'Password reset successfully' });
+    const result = await AuthService.resetPasswordEmail(req.body.phone);
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
   } catch (err: any) {
-    res.status(400).json({ success: false, message: err.message });
+    res.status(400).json({
+      success: false,
+      message: err.message,
+    });
   }
 }
 

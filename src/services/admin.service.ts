@@ -4,6 +4,7 @@ import { prisma } from '../config/prisma';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { notifyRiders, notifyUser } from '../socket/socket.manager';
+import { validateOpeningHours } from './vendor.service';
 // ─── OVERVIEW STATS ─────────────────────────────────────
 
 export async function getOverviewStats() {
@@ -608,7 +609,7 @@ export async function createVendorWithOwner(data: {
   businessType: string;
   address: string;
   phone: string;
-  openingHours?: string;
+  openingHours?: unknown;
   logo?: string;
   ownerName: string;
   ownerPhone: string;
@@ -620,6 +621,8 @@ export async function createVendorWithOwner(data: {
 
   const tempPassword = data.password?.trim() || crypto.randomBytes(4).toString('hex');
   const passwordHash = await bcrypt.hash(tempPassword, 10);
+  
+  const openingHours = data.openingHours ? validateOpeningHours(data.openingHours) : undefined;
 
   const vendor = await prisma.$transaction(async (tx) => {
     const user = await tx.user.create({
@@ -640,7 +643,7 @@ export async function createVendorWithOwner(data: {
         businessType: data.businessType,
         address: data.address.trim(),
         phone: data.phone.trim(),
-        openingHours: data.openingHours || null,
+        openingHours: openingHours ?? undefined,
         logo: data.logo || null,
         status: 'ACTIVE', // admin-created vendors are pre-approved
       },
@@ -653,14 +656,19 @@ export async function createVendorWithOwner(data: {
 
 export async function updateVendorProfile(
   vendorId: string,
-  data: { businessName?: string; businessType?: string; address?: string; phone?: string; openingHours?: string; logo?: string; }
+  data: { businessName?: string; businessType?: string; address?: string; phone?: string; openingHours?: unknown; logo?: string; }
 ) {
   const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
   if (!vendor) throw new Error('Vendor not found');
 
+  const payload: any = { ...data };
+  if (data.openingHours !== undefined) {
+    payload.openingHours = validateOpeningHours(data.openingHours);
+  }
+
   return prisma.vendor.update({
     where: { id: vendorId },
-    data,
+    data: payload,
     include: { user: { select: { name: true, phone: true, email: true } } },
   });
 }

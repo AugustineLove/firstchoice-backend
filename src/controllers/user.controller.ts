@@ -14,10 +14,11 @@ export async function getMe(req: AuthRequest, res: Response) {
 
 export async function updateProfile(req: AuthRequest, res: Response) {
   try {
-    const { name, email, profileImage } = req.body;
+    const { name, email, phone, profileImage } = req.body;
     const user = await UserService.updateProfile(req.user!.id, {
       name,
       email,
+      phone,
       profileImage,
     });
     res.status(200).json({ success: true, data: user });

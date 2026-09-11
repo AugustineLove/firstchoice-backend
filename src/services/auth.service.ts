@@ -201,8 +201,6 @@ export async function resetPasswordEmail(phone: string) {
 
   const token = crypto.randomBytes(32).toString("hex");
 
-  const hashedToken = await bcrypt.hash(token, 10);
-  console.log(`Token: ${token}, HashedToken: ${hashedToken}`)
   await prisma.user.update({
     where: { id: user.id },
     data: {
@@ -211,21 +209,18 @@ export async function resetPasswordEmail(phone: string) {
     },
   });
 
-
   const resetLink =
     `https://firstchoice-ten.vercel.app/reset-password?token=${token}&email=${encodeURIComponent(user.email)}`;
 
-
-    console.log(`Email: ${user.email}, Name: ${user.name}, ResetLink: ${resetLink}`)
   await sendPasswordResetEmail(
     user.email,
     user.name,
     resetLink
   );
 
-
   return {
     message: "Password reset link sent",
+    email: user.email,
   };
 }
 

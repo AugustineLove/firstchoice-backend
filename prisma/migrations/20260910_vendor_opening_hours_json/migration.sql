@@ -1,0 +1,7 @@
+-- Vendor.openingHours was manually changed from TEXT to JSONB
+-- in production.
+--
+-- The original TEXT values were preserved in openingHours_old.
+--
+-- This migration is intentionally empty because the production
+-- schema change has already been performed manually.

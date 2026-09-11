@@ -1,5 +1,7 @@
 import { prisma } from '../config/prisma';
 import * as NotificationService from './notification.service';
+import { isWithinHours } from '../utils/hours.util';
+
 export async function registerVendor(
   userId: string,
   data: {
@@ -8,7 +10,7 @@ export async function registerVendor(
     address: string;
     phone: string;
     logo?: string;
-    openingHours?: string;
+    openingHours?: unknown;
   }
 ) {
   const existingVendor = await prisma.vendor.findUnique({ where: { userId } });
@@ -16,6 +18,9 @@ export async function registerVendor(
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new Error('User not found');
+
+  const openingHours = data.openingHours ? validateOpeningHours(data.openingHours) : undefined;
+
 
   const vendor = await prisma.$transaction(async (tx) => {
     const newVendor = await tx.vendor.create({
@@ -26,7 +31,7 @@ export async function registerVendor(
         address: data.address.trim(),
         phone: data.phone.trim(),
         logo: data.logo || null,
-        openingHours: data.openingHours || null,
+        openingHours: openingHours ?? undefined,
       },
     });
 
@@ -56,7 +61,7 @@ export async function getVendorProfile(vendorId: string) {
   });
 
   if (!vendor) throw new Error('Vendor not found');
-  return vendor;
+  return { ...vendor, isOpen: isWithinHours(vendor.openingHours as any) };
 }
 
 export async function getMyVendorProfile(userId: string) {
@@ -78,7 +83,7 @@ export async function updateVendorProfile(
     address?: string;
     phone?: string;
     logo?: string;
-    openingHours?: string;
+    openingHours?: unknown;
     latitude?: string;
     longitude?: string;
   }
@@ -101,36 +106,29 @@ export async function updateVendorProfile(
     }
   }
 
-  return prisma.vendor.update({
-    where: { userId },
-    data,
-  });
+   const payload: any = { ...data };
+  if (data.openingHours !== undefined) {
+    payload.openingHours = validateOpeningHours(data.openingHours);
+  }
+
+  return prisma.vendor.update({ where: { userId }, data: payload });
 }
 
-export async function getAllVendors(filters: {
-  businessType?: string;
-  search?: string;
-}) {
-  return prisma.vendor.findMany({
+export async function getAllVendors(filters: { businessType?: string; search?: string }) {
+  const vendors = await prisma.vendor.findMany({
     where: {
       status: 'ACTIVE',
       ...(filters.businessType && { businessType: filters.businessType }),
-      ...(filters.search && {
-        businessName: { contains: filters.search, mode: 'insensitive' },
-      }),
+      ...(filters.search && { businessName: { contains: filters.search, mode: 'insensitive' } }),
     },
     select: {
-      id: true,
-      businessName: true,
-      businessType: true,
-      address: true,
-      logo: true,
-      openingHours: true,
-      rating: true,
-      status: true,
+      id: true, businessName: true, businessType: true, address: true,
+      logo: true, openingHours: true, rating: true, status: true,
     },
     orderBy: { rating: 'desc' },
   });
+
+  return vendors.map((v) => ({ ...v, isOpen: isWithinHours(v.openingHours as any) }));
 }
 
 export async function getVendorOrders(userId: string) {
@@ -183,4 +181,38 @@ export async function getVendorStats(userId: string) {
     totalProducts,
     totalRevenue: revenue._sum.totalAmount || 0,
   };
+}
+
+type DayHours = { start: string; end: string }[];
+type WeeklyHours = Record<string, DayHours>;
+
+const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+export function validateOpeningHours(hours: unknown): WeeklyHours {
+  if (typeof hours !== 'object' || hours === null) {
+    throw new Error('openingHours must be an object keyed by day (0-6)');
+  }
+  const result: WeeklyHours = {};
+  for (const [day, ranges] of Object.entries(hours as Record<string, unknown>)) {
+    const dayNum = Number(day);
+    if (!Number.isInteger(dayNum) || dayNum < 0 || dayNum > 6) {
+      throw new Error(`Invalid day key "${day}" — must be 0-6`);
+    }
+    if (!Array.isArray(ranges)) {
+      throw new Error(`openingHours["${day}"] must be an array`);
+    }
+    result[day] = ranges.map((r: any) => {
+      if (!r || typeof r.start !== 'string' || typeof r.end !== 'string') {
+        throw new Error(`Invalid time range for day ${day}`);
+      }
+      if (!TIME_RE.test(r.start) || !TIME_RE.test(r.end)) {
+        throw new Error(`Times must be HH:mm — got "${r.start}"–"${r.end}"`);
+      }
+      if (r.start >= r.end) {
+        throw new Error(`Range start must be before end (day ${day})`);
+      }
+      return { start: r.start, end: r.end };
+    });
+  }
+  return result;
 }
