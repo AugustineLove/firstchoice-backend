@@ -11,75 +11,122 @@ import { LOGISTICS_MANAGER_NUMBERS } from '../utils/constants';
 import { sendCustomerMessage } from './message.service';
 import { getSettings } from './setting.service';
 
-function calculateDeliveryEstimate(
-  pickupLat?: number,
-  pickupLng?: number,
-  destLat?: number,
-  destLng?: number,
-): number {
-  if (pickupLat && pickupLng && destLat && destLng) {
-    const R = 6371;
+// function calculateDeliveryEstimate(
+//   pickupLat?: number,
+//   pickupLng?: number,
+//   destLat?: number,
+//   destLng?: number,
+// ): number {
+//   if (pickupLat && pickupLng && destLat && destLng) {
+//     const R = 6371;
 
-    const dLat = ((destLat - pickupLat) * Math.PI) / 180;
-    const dLng = ((destLng - pickupLng) * Math.PI) / 180;
+//     const dLat = ((destLat - pickupLat) * Math.PI) / 180;
+//     const dLng = ((destLng - pickupLng) * Math.PI) / 180;
 
-    const a =
-      Math.sin(dLat / 2) ** 2 +
-      Math.cos((pickupLat * Math.PI) / 180) *
-        Math.cos((destLat * Math.PI) / 180) *
-        Math.sin(dLng / 2) ** 2;
+//     const a =
+//       Math.sin(dLat / 2) ** 2 +
+//       Math.cos((pickupLat * Math.PI) / 180) *
+//         Math.cos((destLat * Math.PI) / 180) *
+//         Math.sin(dLng / 2) ** 2;
 
-    const km = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//     const km = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-    if (km <= 1) return 5;
-  if (km <= 1.5) return 6;
-  if (km <= 2) return 7;
-  if (km <= 2.5) return 8;
-  if (km <= 3) return 9;
-  if (km <= 3.5) return 10;
-  if (km <= 4) return 11;
-  if (km <= 4.5) return 12;
-  if (km <= 5) return 13;
-  if (km <= 5.5) return 14;
-  if (km <= 6) return 15;
-  if (km <= 6.5) return 16;
-  if (km <= 7) return 17;
-  if (km <= 7.5) return 18;
-  if (km <= 8) return 19;
-  if (km <= 8.5) return 20;
-  if (km <= 9) return 21;
-  if (km <= 9.5) return 22;
-  if (km <= 10) return 23;
-  if (km <= 10.5) return 24;
-  if (km <= 11) return 25;
-  if (km <= 11.5) return 26;
-  if (km <= 12) return 27;
-  if (km <= 12.5) return 28;
-  if (km <= 13) return 29;
-  if (km <= 13.5) return 30;
-  if (km <= 14) return 31;
-  if (km <= 14.5) return 32;
-  if (km <= 15) return 33;
-  if (km <= 15.5) return 34;
-  if (km <= 16) return 35;
-  if (km <= 16.5) return 36;
-  if (km <= 17) return 37;
-  if (km <= 17.5) return 38;
-  if (km <= 18) return 39;
-  if (km <= 18.5) return 40;
-  if (km <= 19) return 41;
-  if (km <= 19.5) return 42;
-  if (km <= 20) return 43;
-  if (km <= 20.5) return 44;
-  if (km <= 21) return 45;
-  if (km <= 21.5) return 46;
-  if (km <= 22) return 47;
-  if (km <= 22.5) return 48;
-  if (km <= 23) return 49;
-  return 50;
+//     if (km <= 1) return 5;
+//   if (km <= 1.5) return 6;
+//   if (km <= 2) return 7;
+//   if (km <= 2.5) return 8;
+//   if (km <= 3) return 9;
+//   if (km <= 3.5) return 10;
+//   if (km <= 4) return 11;
+//   if (km <= 4.5) return 12;
+//   if (km <= 5) return 13;
+//   if (km <= 5.5) return 14;
+//   if (km <= 6) return 15;
+//   if (km <= 6.5) return 16;
+//   if (km <= 7) return 17;
+//   if (km <= 7.5) return 18;
+//   if (km <= 8) return 19;
+//   if (km <= 8.5) return 20;
+//   if (km <= 9) return 21;
+//   if (km <= 9.5) return 22;
+//   if (km <= 10) return 23;
+//   if (km <= 10.5) return 24;
+//   if (km <= 11) return 25;
+//   if (km <= 11.5) return 26;
+//   if (km <= 12) return 27;
+//   if (km <= 12.5) return 28;
+//   if (km <= 13) return 29;
+//   if (km <= 13.5) return 30;
+//   if (km <= 14) return 31;
+//   if (km <= 14.5) return 32;
+//   if (km <= 15) return 33;
+//   if (km <= 15.5) return 34;
+//   if (km <= 16) return 35;
+//   if (km <= 16.5) return 36;
+//   if (km <= 17) return 37;
+//   if (km <= 17.5) return 38;
+//   if (km <= 18) return 39;
+//   if (km <= 18.5) return 40;
+//   if (km <= 19) return 41;
+//   if (km <= 19.5) return 42;
+//   if (km <= 20) return 43;
+//   if (km <= 20.5) return 44;
+//   if (km <= 21) return 45;
+//   if (km <= 21.5) return 46;
+//   if (km <= 22) return 47;
+//   if (km <= 22.5) return 48;
+//   if (km <= 23) return 49;
+//   return 50;
+//   }
+
+//   return 0;
+// }
+
+const _kBaseFeeGhs = 5;
+const _kPerKmGhs = 2;
+
+function calculateDeliveryEstimate({
+  pickupLat,
+  pickupLng,
+  destLat,
+  destLng,
+}: {
+  pickupLat?: number | null;
+  pickupLng?: number | null;
+  destLat?: number | null;
+  destLng?: number | null;
+}): number {
+  if (
+    pickupLat == null ||
+    pickupLng == null ||
+    destLat == null ||
+    destLng == null
+  ) {
+    return 10; // fallback flat fee if coords missing
   }
 
-  return 0;
+  const earthRadiusKm = 6371.0;
+
+  const toRad = (degrees: number) => (degrees * Math.PI) / 180;
+
+  const dLat = toRad(destLat - pickupLat);
+  const dLng = toRad(destLng - pickupLng);
+
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(pickupLat)) *
+      Math.cos(toRad(destLat)) *
+      Math.sin(dLng / 2) ** 2;
+
+  const c =
+    2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  const distanceKm = earthRadiusKm * c;
+
+  const fee =
+    _kBaseFeeGhs + distanceKm * _kPerKmGhs;
+
+  return Math.round(fee);
 }
 
 function calculateErrandFee(
@@ -336,9 +383,12 @@ export async function createDeliveryRequest(
     if (!itemDescription) throw new Error('Item description is required.');
   }
 
-  const deliveryFee = calculateDeliveryEstimate(
-    pickupLatitude, pickupLongitude, data.destinationLatitude, data.destinationLongitude,
-  );
+  const deliveryFee = calculateDeliveryEstimate({
+  pickupLat: pickupLatitude,
+  pickupLng: pickupLongitude,
+  destLat: data.destinationLatitude,
+  destLng: data.destinationLongitude,
+  });
   const estimatedFee = deliveryFee + errandFee; // service fee only — items cost tracked separately
 
   const delivery = await prisma.deliveryRequest.create({

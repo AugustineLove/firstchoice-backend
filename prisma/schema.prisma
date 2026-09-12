@@ -154,7 +154,7 @@ model Vendor {
   address      String
   phone        String
   logo         String?
-  openingHours Json?      
+  openingHours Json?
   status       VendorStatus @default(PENDING)
   rating       Float        @default(0)
   createdAt    DateTime     @default(now())

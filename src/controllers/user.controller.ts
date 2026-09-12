@@ -44,7 +44,7 @@ export async function uploadAvatar(req: AuthRequest, res: Response) {
     });
 
     const user = await UserService.updateProfile(req.user!.id, { profileImage: uploadResult.secure_url });
-    res.status(200).json({ success: true, message: 'Avatar updated', data: { } });
+    res.status(200).json({ success: true, message: 'Avatar updated', data: user });   // ← return it
   } catch (err: any) {
     res.status(400).json({ success: false, message: err.message || 'Avatar upload failed' });
   }
