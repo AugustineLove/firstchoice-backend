@@ -42,9 +42,12 @@ exports.notifyVendorPendingApproval = notifyVendorPendingApproval;
 exports.notifyNewErrand = notifyNewErrand;
 exports.notifyErrandStatusChange = notifyErrandStatusChange;
 exports.updateFcmToken = updateFcmToken;
+exports.notifyRidersNewOrder = notifyRidersNewOrder;
+exports.sendBroadcastNotification = sendBroadcastNotification;
 const admin = __importStar(require("firebase-admin"));
 const prisma_1 = require("../config/prisma");
 const socket_manager_1 = require("../socket/socket.manager");
+// import { sendTelegramToMany } from './telegram.service';
 const app = admin.apps.length > 0
     ? admin.app()
     : // This converts the string to a valid JSON object
@@ -65,67 +68,42 @@ function cleanString(str) {
         .trim();
 }
 async function sendToUser(userId, payload) {
-    try {
-        const user = await prisma_1.prisma.user.findUnique({
-            where: { id: userId },
-            select: { fcmToken: true, name: true },
-        });
-        console.log(`SendToUser notification user: ${JSON.stringify(user)}`);
-        const cleanToken = cleanString(user?.fcmToken);
-        if (!cleanToken)
-            return false;
-        if (!user?.fcmToken)
-            return false;
-        // 1. Clean the payload parts carefully up front
-        const safeTitle = cleanString(payload.title);
-        const safeBody = cleanString(payload.body);
-        const safeData = {};
-        if (payload.data) {
-            for (const [key, value] of Object.entries(payload.data)) {
-                safeData[key] = cleanString(value);
+    const user = await prisma_1.prisma.user.findUnique({
+        where: { id: userId },
+        select: { fcmToken: true, webFcmToken: true },
+    });
+    const tokens = [user?.fcmToken, user?.webFcmToken].filter(Boolean).map(cleanString);
+    if (!tokens.length)
+        return false;
+    const safeTitle = cleanString(payload.title);
+    const safeBody = cleanString(payload.body);
+    const safeData = {};
+    if (payload.data) {
+        for (const [k, v] of Object.entries(payload.data)) {
+            safeData[k] = cleanString(v);
+        }
+    }
+    const results = await Promise.allSettled(tokens.map((token) => app.messaging().send({
+        token,
+        notification: { title: safeTitle, body: safeBody },
+        data: safeData,
+        android: { priority: 'high', notification: { channelId: 'firstchoice_channel', priority: 'high' } },
+        apns: { payload: { aps: { sound: 'default', badge: 1 } } },
+        webpush: { fcmOptions: { link: safeData.screen ? `/${safeData.screen}` : '/' } },
+    })));
+    results.forEach((r, i) => {
+        if (r.status === 'rejected') {
+            console.error(`[push] send failed for user ${userId}, token ${tokens[i]?.slice(0, 12)}...:`, r.reason?.code, r.reason?.message);
+            if (r.reason?.code === 'messaging/registration-token-not-registered') {
+                const field = tokens[i] === user.fcmToken ? 'fcmToken' : 'webFcmToken';
+                prisma_1.prisma.user.update({ where: { id: userId }, data: { [field]: null } }).catch(() => { });
             }
         }
-        // 2. Safe log logging
-        console.log("CLEANED PAYLOAD:", JSON.stringify({ title: safeTitle, body: safeBody, data: safeData }, null, 2));
-        await app.messaging().send({
-            token: cleanToken,
-            notification: {
-                title: safeTitle,
-                body: safeBody,
-                ...(payload.imageUrl && { imageUrl: payload.imageUrl }),
-            },
-            data: safeData,
-            android: {
-                priority: "high",
-                notification: {
-                    channelId: "firstchoice_channel",
-                    priority: "high",
-                    defaultSound: true,
-                    defaultVibrateTimings: true,
-                },
-            },
-            apns: {
-                payload: {
-                    aps: {
-                        sound: "default",
-                        badge: 1,
-                        contentAvailable: true,
-                    },
-                },
-            },
-        });
-        return true;
-    }
-    catch (err) {
-        if (err.code === 'messaging/registration-token-not-registered') {
-            await prisma_1.prisma.user.update({
-                where: { id: userId },
-                data: { fcmToken: null },
-            }).catch(() => { });
+        else {
+            console.log(`[push] sent OK to user ${userId}, token ${tokens[i]?.slice(0, 12)}...`);
         }
-        console.error(`Push failed for user ${userId}:`, err?.message || err);
-        return false;
-    }
+    });
+    return results.some((r) => r.status === 'fulfilled');
 }
 async function sendToMany(userIds, payload) {
     await Promise.allSettled(userIds.map(id => sendToUser(id, payload)));
@@ -154,8 +132,6 @@ async function notifyNewOrder(orderId) {
         .map(i => i.product.name)
         .join(', ')
         + (order.items.length > 2 ? ` +${order.items.length - 2} more` : '');
-    // → Vendor
-    console.log(JSON.stringify(order));
     await sendToUser(order.vendor.user.id, {
         title: 'New Order',
         body: `${order.customer.name} ordered ${itemSummary} GHS ${order.subtotal.toFixed(2)}`,
@@ -191,6 +167,7 @@ async function notifyOrderStatusChange(orderId, newStatus) {
             customer: { select: { id: true, name: true } },
             vendor: { include: { user: { select: { id: true } } } },
             rider: { include: { user: { select: { id: true, name: true } } } },
+            items: { include: { product: { select: { name: true } } } },
         },
     });
     if (!order)
@@ -201,6 +178,8 @@ async function notifyOrderStatusChange(orderId, newStatus) {
         READY_FOR_PICKUP: { title: '📦 Ready for Pickup', body: 'Your order is ready and waiting for a rider.' },
         RIDER_ASSIGNED: { title: '🛵 Rider Assigned', body: `${order.rider?.user.name ?? 'A rider'} is coming to pick up your order!` },
         PICKED_UP: { title: '🛵 Order Picked Up', body: 'Your order has been picked up and is on the way!' },
+        IN_TRANSIT: { title: '🛵 Order Coming To You', body: 'Your order is on the way to you.' },
+        ARRIVED: { title: '📍 Rider Has Arrived', body: 'Your rider is outside — please come collect your order!' }, // ← new
         DELIVERED: { title: '🎉 Order Delivered!', body: `Your order from ${order.vendor.businessName} has been delivered. Enjoy!` },
         CANCELLED: { title: '❌ Order Cancelled', body: `Your order from ${order.vendor.businessName} was cancelled.` },
     };
@@ -213,11 +192,23 @@ async function notifyOrderStatusChange(orderId, newStatus) {
         ...msg,
         data: baseData,
     });
+    const itemSummary = order.items.slice(0, 2).map(i => i.product.name).join(', ')
+        + (order.items.length > 2 ? ` +${order.items.length - 2} more` : '');
+    const admins = await prisma_1.prisma.user.findMany({
+        where: { role: 'ADMIN', telegramChatId: { not: null } },
+        select: { telegramChatId: true },
+    });
+    // await sendTelegramToMany(
+    //   admins.map(a => a.telegramChatId!),
+    //   `📦 <b>New Order</b>\nFrom ${order.customer.name} at ${order.vendor.businessName}\nItems: ${itemSummary}\nTotal: GHS ${order.totalAmount.toFixed(2)}\nOrder #${orderId.slice(-6).toUpperCase()}`
+    // );
     // → Vendor gets notified on rider assignment, pickup, delivery, cancel
-    if (['RIDER_ASSIGNED', 'PICKED_UP', 'DELIVERED', 'CANCELLED'].includes(newStatus)) {
+    if (['RIDER_ASSIGNED', 'PICKED_UP', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED', 'CANCELLED'].includes(newStatus)) {
         const vendorMessages = {
             RIDER_ASSIGNED: { title: '🛵 Rider On The Way', body: `${order.rider?.user.name} is heading to pick up order #${orderId.slice(-6).toUpperCase()}` },
             PICKED_UP: { title: '✅ Order Picked Up', body: `Order #${orderId.slice(-6).toUpperCase()} has been picked up.` },
+            IN_TRANSIT: { title: '✅ Order Coming To You', body: `Order #${orderId.slice(-6).toUpperCase()} has been picked up and is on the way to you.` },
+            ARRIVED: { title: '📍 Rider Arrived', body: `Rider has arrived with order #${orderId.slice(-6).toUpperCase()}.` }, // ← new
             DELIVERED: { title: '🎉 Order Delivered', body: `Order #${orderId.slice(-6).toUpperCase()} was delivered successfully!` },
             CANCELLED: { title: '❌ Order Cancelled', body: `Order #${orderId.slice(-6).toUpperCase()} was cancelled.` },
         };
@@ -264,7 +255,7 @@ async function notifyDeliveryStatusChange(deliveryId, newStatus) {
     const delivery = await prisma_1.prisma.deliveryRequest.findUnique({
         where: { id: deliveryId },
         include: {
-            customer: { select: { id: true } },
+            customer: { select: { id: true, name: true } },
             rider: { include: { user: { select: { id: true, name: true } } } },
         },
     });
@@ -284,6 +275,24 @@ async function notifyDeliveryStatusChange(deliveryId, newStatus) {
         ...msg,
         data: { type: 'DELIVERY_STATUS', deliveryId, status: newStatus, screen: 'delivery_detail' },
     });
+    const [onlineRiders, admins] = await Promise.all([
+        prisma_1.prisma.rider.findMany({
+            where: { availability: 'ONLINE', user: { telegramChatId: { not: null } } },
+            include: { user: { select: { telegramChatId: true } } },
+        }),
+        prisma_1.prisma.user.findMany({
+            where: { role: 'ADMIN', telegramChatId: { not: null } },
+            select: { telegramChatId: true },
+        }),
+    ]);
+    const chatIds = [
+        ...onlineRiders.map(r => r.user.telegramChatId),
+        ...admins.map(a => a.telegramChatId),
+    ];
+    // await sendTelegramToMany(
+    //   chatIds,
+    //   `🚀 <b>New Delivery Request</b>\nFrom ${delivery.customer.name}\n${delivery.pickupAddress} → ${delivery.destinationAddress}\nFee: GHS ${delivery.estimatedFee.toFixed(2)}\nTap to accept in the app.`
+    // );
 }
 // ─── VENDOR NOTIFICATIONS ─────────────────────────────────
 async function notifyVendorApproved(vendorUserId, businessName) {
@@ -339,5 +348,42 @@ async function updateFcmToken(userId, token) {
         where: { id: userId },
         data: { fcmToken: token },
     });
+}
+// notification.service.ts
+async function notifyRidersNewOrder(orderId) {
+    const order = await prisma_1.prisma.order.findUnique({
+        where: { id: orderId },
+        include: { vendor: { select: { businessName: true } } },
+    });
+    if (!order)
+        return;
+    const onlineRiders = await prisma_1.prisma.rider.findMany({
+        where: { availability: 'ONLINE' },
+        include: { user: { select: { id: true } } },
+    });
+    if (!onlineRiders.length)
+        return;
+    await sendToMany(onlineRiders.map(r => r.user.id), {
+        title: '🚀 New Order Request!',
+        body: `${order.vendor.businessName} — GHS ${order.deliveryFee?.toFixed(2) ?? '0.00'} delivery fee • Tap to accept`,
+        data: { type: 'NEW_DELIVERY', orderId: order.id, screen: 'available_deliveries' },
+    });
+}
+// ─── BROADCAST NOTIFICATIONS ──────────────────────────────
+async function sendBroadcastNotification(payload) {
+    const users = await prisma_1.prisma.user.findMany({
+        where: {
+            status: 'ACTIVE',
+            ...(payload.role && { role: payload.role }),
+            OR: [{ webFcmToken: { not: null } }, { fcmToken: { not: null } }],
+        },
+        select: { id: true },
+    });
+    await sendToMany(users.map(u => u.id), {
+        title: payload.title,
+        body: payload.body,
+        data: { type: 'BROADCAST', screen: 'home' },
+    });
+    return { total: users.length };
 }
 //# sourceMappingURL=notification.service.js.map

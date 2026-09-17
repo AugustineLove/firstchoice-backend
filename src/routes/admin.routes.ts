@@ -39,8 +39,12 @@ adminRouter.get('/riders/:id/jobs',      AdminController.riderJobHistory);
 // Riders
 adminRouter.get('/riders', AdminController.getAllRiders);
 
-// Order assignment
+// Order assignment & status
 adminRouter.patch('/orders/:orderId/assign', AdminController.assignRiderToOrder);
+adminRouter.patch('/orders/:orderId/status', AdminController.updateOrderStatus);
+
+// Delivery assignment
+adminRouter.patch('/deliveries/:deliveryId/assign', AdminController.assignRiderToDelivery);
 
 // Analytics
 adminRouter.get('/analytics/orders', AdminController.getOrderAnalytics);

@@ -41,6 +41,7 @@ exports.getOrderById = getOrderById;
 exports.updateOrderStatus = updateOrderStatus;
 exports.cancelOrder = cancelOrder;
 exports.getAllOrders = getAllOrders;
+exports.emitOrderEvent = emitOrderEvent;
 exports.getOrdersReadyForPickup = getOrdersReadyForPickup;
 exports.riderAcceptOrder = riderAcceptOrder;
 exports.attachOrderImage = attachOrderImage;
@@ -48,54 +49,103 @@ const prisma_1 = require("../config/prisma");
 const socket_manager_1 = require("../socket/socket.manager");
 const NotificationService = __importStar(require("./notification.service"));
 const cloudinary_1 = __importDefault(require("../config/cloudinary"));
-// In placeOrder, update the items validation and price calculation:
-// Same tiered-by-distance table used on the deliveries page / mobile app.
-// Used only for SIMPLE (note-based) orders, where there's no subtotal yet
-// to base a fee on — we price off distance instead, same as a delivery.
+const message_service_1 = require("./message.service");
+const constants_1 = require("../utils/constants");
+// function calculateDeliveryFeeByDistance({
+//   pickupLat, pickupLng, destLat, destLng,
+// }: {
+//   pickupLat?: number | null;
+//   pickupLng?: number | null;
+//   destLat?: number | null;
+//   destLng?: number | null;
+// }) {
+//   if (
+//     pickupLat == null ||
+//     pickupLng == null ||
+//     destLat == null ||
+//     destLng == null
+//   ) {
+//     return 10; // fallback flat fee if coords missing
+//   }
+//   const r = 6371;
+//   const toRad = (d: number) => (d * Math.PI) / 180;
+//   const dLat = toRad(destLat - pickupLat);
+//   const dLng = toRad(destLng - pickupLng);
+//   const a =
+//     Math.sin(dLat / 2) ** 2 +
+//     Math.cos(toRad(pickupLat)) *
+//       Math.cos(toRad(destLat)) *
+//       Math.sin(dLng / 2) ** 2;
+//   const km =
+//     r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//   if (km <= 1) return 5;
+//   if (km <= 1.5) return 6;
+//   if (km <= 2) return 7;
+//   if (km <= 2.5) return 8;
+//   if (km <= 3) return 9;
+//   if (km <= 3.5) return 10;
+//   if (km <= 4) return 11;
+//   if (km <= 4.5) return 12;
+//   if (km <= 5) return 13;
+//   if (km <= 5.5) return 14;
+//   if (km <= 6) return 15;
+//   if (km <= 6.5) return 16;
+//   if (km <= 7) return 17;
+//   if (km <= 7.5) return 18;
+//   if (km <= 8) return 19;
+//   if (km <= 8.5) return 20;
+//   if (km <= 9) return 21;
+//   if (km <= 9.5) return 22;
+//   if (km <= 10) return 23;
+//   if (km <= 10.5) return 24;
+//   if (km <= 11) return 25;
+//   if (km <= 11.5) return 26;
+//   if (km <= 12) return 27;
+//   if (km <= 12.5) return 28;
+//   if (km <= 13) return 29;
+//   if (km <= 13.5) return 30;
+//   if (km <= 14) return 31;
+//   if (km <= 14.5) return 32;
+//   if (km <= 15) return 33;
+//   if (km <= 15.5) return 34;
+//   if (km <= 16) return 35;
+//   if (km <= 16.5) return 36;
+//   if (km <= 17) return 37;
+//   if (km <= 17.5) return 38;
+//   if (km <= 18) return 39;
+//   if (km <= 18.5) return 40;
+//   if (km <= 19) return 41;
+//   if (km <= 19.5) return 42;
+//   if (km <= 20) return 43;
+//   if (km <= 20.5) return 44;
+//   if (km <= 21) return 45;
+//   if (km <= 21.5) return 46;
+//   if (km <= 22) return 47;
+//   if (km <= 22.5) return 48;
+//   if (km <= 23) return 49;
+//   return 50;
+// }
+const _kBaseFeeGhs = 5;
+const _kPerKmGhs = 2;
 function calculateDeliveryFeeByDistance({ pickupLat, pickupLng, destLat, destLng, }) {
-    if (pickupLat == null || pickupLng == null || destLat == null || destLng == null)
+    if (pickupLat == null ||
+        pickupLng == null ||
+        destLat == null ||
+        destLng == null) {
         return 10; // fallback flat fee if coords missing
-    const r = 6371;
-    const toRad = (d) => (d * Math.PI) / 180;
+    }
+    const earthRadiusKm = 6371.0;
+    const toRad = (degrees) => (degrees * Math.PI) / 180;
     const dLat = toRad(destLat - pickupLat);
     const dLng = toRad(destLng - pickupLng);
-    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(pickupLat)) * Math.cos(toRad(destLat)) * Math.sin(dLng / 2) ** 2;
-    const km = r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    if (km <= 1)
-        return 5;
-    if (km <= 1.5)
-        return 6;
-    if (km <= 2)
-        return 7;
-    if (km <= 2.5)
-        return 8;
-    if (km <= 3)
-        return 9;
-    if (km <= 3.5)
-        return 10;
-    if (km <= 4)
-        return 11;
-    if (km <= 4.5)
-        return 12;
-    if (km <= 5)
-        return 13;
-    if (km <= 5.5)
-        return 14;
-    if (km <= 6)
-        return 15;
-    if (km <= 6.5)
-        return 16;
-    if (km <= 7)
-        return 17;
-    if (km <= 7.5)
-        return 18;
-    if (km <= 8)
-        return 19;
-    if (km <= 8.5)
-        return 20;
-    if (km <= 9)
-        return 21;
-    return 25;
+    const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(pickupLat)) *
+            Math.cos(toRad(destLat)) *
+            Math.sin(dLng / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distanceKm = earthRadiusKm * c;
+    const fee = _kBaseFeeGhs + distanceKm * _kPerKmGhs;
+    return Math.round(fee);
 }
 async function placeOrder(customerId, data) {
     const vendor = await prisma_1.prisma.vendor.findUnique({ where: { id: data.vendorId } });
@@ -104,6 +154,7 @@ async function placeOrder(customerId, data) {
     if (vendor.status !== 'ACTIVE')
         throw new Error('This vendor is currently unavailable');
     const hasStructuredItems = Array.isArray(data.items) && data.items.length > 0;
+    console.log(`Sub total: ${data.subtotal}`);
     // ═══════════════════════════════════════════════════════
     // LEGACY FLOW — untouched. Kicks in only when items[] is sent.
     // ═══════════════════════════════════════════════════════
@@ -166,6 +217,7 @@ async function placeOrder(customerId, data) {
                     items: { create: orderItems },
                 },
                 include: {
+                    customer: { select: { id: true, name: true, phone: true } },
                     items: { include: { product: { select: { name: true, images: true } } } },
                     vendor: { select: { businessName: true, logo: true, phone: true } },
                 },
@@ -178,7 +230,15 @@ async function placeOrder(customerId, data) {
             }
             return newOrder;
         }, { timeout: 15000, maxWait: 30000 });
+        (0, message_service_1.sendCustomerMessage)({
+            messageTo: constants_1.LOGISTICS_MANAGER_NUMBERS,
+            messageFrom: 'FirstChoice',
+            message: `New order placed by ${order.customer.name} at: ${order.vendor.businessName} to ${order.deliveryAddress}.\nCustomer phone: ${order.customer.phone}\nDelivery Fee: GHS ${order.deliveryFee?.toFixed(2)}\nTotal: GHS ${order.totalAmount?.toFixed(2)}.`,
+        });
+        (0, socket_manager_1.notifyRiders)('delivery:new_request', order);
         await NotificationService.notifyNewOrder(order.id);
+        await NotificationService.notifyRidersNewOrder(order.id);
+        console.log('Order placed successfully, sending message to logistics managers...');
         return order;
     }
     // ═══════════════════════════════════════════════════════
@@ -209,18 +269,30 @@ async function placeOrder(customerId, data) {
             pickupLatitude: Number(vendor.latitude) || null,
             pickupLongitude: Number(vendor.longitude) || null,
             vendorAddress: vendor.businessName,
-            subtotal: 0, // unknown until vendor confirms
+            subtotal: data.subtotal, // unknown until vendor confirms
             deliveryFee,
             totalAmount: deliveryFee, // updated once vendor sets item pricing
             orderType: 'MARKETPLACE',
             orderStatus: 'PENDING',
         },
         include: {
+            customer: { select: { id: true, name: true, phone: true } },
             vendor: { select: { businessName: true, logo: true, phone: true } },
         },
     });
+    (0, message_service_1.sendCustomerMessage)({
+        messageTo: constants_1.LOGISTICS_MANAGER_NUMBERS,
+        messageFrom: 'FirstChoice',
+        message: `New order placed: ${order.vendor.businessName} → ${order.deliveryAddress}.\nDelivery Fee: GHS ${order.deliveryFee?.toFixed(2)}\nTotal: GHS ${order.totalAmount?.toFixed(2)}.`,
+    });
+    (0, socket_manager_1.notifyRiders)('delivery:new_request', order);
+    (0, socket_manager_1.notifyAdmins)('admin:order_ready_for_dispatch', {
+        orderId: order.id,
+        vendorId: order.vendorId,
+        timestamp: new Date(),
+    });
     await NotificationService.notifyNewOrder(order.id);
-    await NotificationService.notifyNewDelivery(order.id);
+    await NotificationService.notifyRidersNewOrder(order.id);
     return order;
 }
 async function getOrderById(orderId, userId) {
@@ -267,8 +339,9 @@ async function getOrderById(orderId, userId) {
 const validTransitions = {
     PENDING: ['RIDER_ASSIGNED', 'CANCELLED'],
     RIDER_ASSIGNED: ['PICKED_UP', 'CANCELLED'],
-    PICKED_UP: ['IN_TRANSIT'],
-    IN_TRANSIT: ['DELIVERED'],
+    PICKED_UP: ['IN_TRANSIT', 'CANCELLED'],
+    IN_TRANSIT: ['ARRIVED'], // ← was ['DELIVERED']
+    ARRIVED: ['DELIVERED'],
     DELIVERED: [],
     CANCELLED: [],
     ACCEPTED: [],
@@ -286,61 +359,42 @@ async function updateOrderStatus(orderId, userId, newStatus) {
     const vendor = await prisma_1.prisma.vendor.findUnique({ where: { userId } });
     const rider = await prisma_1.prisma.rider.findUnique({ where: { userId } });
     // Role-based permission checks
-    // if (newStatus === 'ACCEPTED') {
-    //   if (vendor?.id !== order.vendorId)
-    //     throw new Error('Only the vendor can update to this status');
-    // }
-    if (newStatus === 'PICKED_UP' || newStatus === 'DELIVERED') {
+    if (newStatus === 'PICKED_UP' || newStatus === 'DELIVERED' || newStatus === 'ARRIVED') {
         if (rider?.id !== order.riderId)
             throw new Error('Only the assigned rider can update to this status');
     }
-    // if (newStatus === 'RIDER_ASSIGNED' && user.role !== 'ADMIN')
-    //   throw new Error('Only admin can assign riders');
+    // ── Rider self-assignment is a special path, not a plain transition ──
     if (newStatus === 'RIDER_ASSIGNED') {
         if (!rider)
             throw new Error('Only riders can accept orders');
         if (order.riderId)
             throw new Error('Order has already been assigned');
         await prisma_1.prisma.$transaction(async (tx) => {
-            const current = await tx.order.findUnique({
-                where: { id: orderId },
-            });
+            const current = await tx.order.findUnique({ where: { id: orderId } });
             if (!current || current.riderId) {
                 throw new Error('Order already assigned');
             }
             await tx.order.update({
                 where: { id: orderId },
-                data: {
-                    riderId: rider.id,
-                    orderStatus: 'RIDER_ASSIGNED',
-                },
+                data: { riderId: rider.id, orderStatus: 'RIDER_ASSIGNED' },
             });
         });
         await emitOrderEvent(orderId, 'RIDER_ASSIGNED');
         await NotificationService.notifyOrderStatusChange(orderId, 'RIDER_ASSIGNED');
+        (0, socket_manager_1.notifyRiders)('delivery:taken', { orderId });
         return;
     }
+    // ── Cancel permission + eligible states ──
     if (newStatus === 'CANCELLED') {
-        const cancellable = ['PENDING', 'ACCEPTED'];
-        if (!cancellable.includes(order.orderStatus))
+        const isCustomer = order.customerId === userId;
+        const isAdmin = user.role === 'ADMIN';
+        const isAssignedRider = !!rider && rider.id === order.riderId;
+        if (!isCustomer && !isAdmin && !isAssignedRider)
+            throw new Error('Only the customer, admin, or assigned rider can cancel');
+        if (!['PENDING', 'RIDER_ASSIGNED', 'PICKED_UP'].includes(order.orderStatus))
             throw new Error('Order can no longer be cancelled');
     }
     if (newStatus === 'PENDING') {
-        console.log('PENDING reached');
-        console.log({
-            type: 'NEW_DELIVERY',
-            orderId: order.id,
-            pickupAddress: vendor?.address,
-            destinationAddress: order.deliveryAddress,
-            itemDescription: order.notes,
-            estimatedFee: order.deliveryFee,
-            paymentMethod: order.paymentMethod,
-            customer: {
-                name: order.recipientName,
-                phone: order.recipientPhone,
-            },
-            createdAt: order.createdAt
-        });
         (0, socket_manager_1.notifyRiders)('delivery:new_request', {
             type: 'NEW_DELIVERY',
             orderId: order.id,
@@ -349,32 +403,46 @@ async function updateOrderStatus(orderId, userId, newStatus) {
             itemDescription: order.notes,
             estimatedFee: order.deliveryFee,
             paymentMethod: order.paymentMethod,
-            customer: {
-                name: order.recipientName,
-                phone: order.recipientPhone,
-            },
-            createdAt: order.createdAt
+            customer: { name: order.recipientName, phone: order.recipientPhone },
+            createdAt: order.createdAt,
         });
     }
-    // Validate transition
+    // ── Validate the transition against the state machine ──
     const allowed = validTransitions[order.orderStatus];
     if (!allowed.includes(newStatus))
         throw new Error(`Cannot transition from ${order.orderStatus} to ${newStatus}`);
+    // ── Apply it, freeing the rider if this was a cancel ──
+    const updated = await prisma_1.prisma.$transaction(async (tx) => {
+        const result = await tx.order.update({
+            where: { id: orderId },
+            data: { orderStatus: newStatus },
+            include: {
+                items: { include: { product: { select: { name: true } } } },
+                vendor: { select: { businessName: true } },
+                rider: { select: { user: { select: { name: true, phone: true } } } },
+            },
+        });
+        if (newStatus === 'DELIVERED' && order.riderId) {
+            await tx.rider.update({
+                where: { id: order.riderId },
+                data: {
+                    totalDeliveries: { increment: 1 },
+                    earnings: { increment: order.deliveryFee ?? 0 },
+                    availability: 'ONLINE',
+                },
+            });
+        }
+        if (newStatus === 'CANCELLED' && order.riderId) {
+            await tx.rider.update({
+                where: { id: order.riderId },
+                data: { availability: 'ONLINE' },
+            });
+        }
+        return result;
+    });
     await emitOrderEvent(orderId, newStatus);
     await NotificationService.notifyOrderStatusChange(orderId, newStatus);
-    return prisma_1.prisma.order.update({
-        where: { id: orderId },
-        data: { orderStatus: newStatus },
-        include: {
-            items: {
-                include: { product: { select: { name: true } } },
-            },
-            vendor: { select: { businessName: true } },
-            rider: {
-                select: { user: { select: { name: true, phone: true } } },
-            },
-        },
-    });
+    return updated;
 }
 async function cancelOrder(orderId, userId) {
     const order = await prisma_1.prisma.order.findUnique({ where: { id: orderId } });
@@ -414,19 +482,63 @@ async function getAllOrders(filters) {
             where,
             skip,
             take: limit,
-            orderBy: { createdAt: 'desc' },
+            orderBy: {
+                createdAt: 'desc',
+            },
             include: {
-                customer: { select: { name: true, phone: true } },
-                vendor: { select: { businessName: true } },
-                rider: {
-                    select: { user: { select: { name: true, phone: true } } },
+                // Customer
+                customer: {
+                    select: {
+                        id: true,
+                        name: true,
+                        phone: true,
+                        email: true,
+                        role: true,
+                    },
                 },
-                items: { include: { product: { select: { name: true } } } },
+                // Vendor
+                vendor: {
+                    select: {
+                        id: true,
+                        businessName: true,
+                        phone: true,
+                        address: true,
+                        logo: true,
+                    },
+                },
+                // Rider
+                rider: {
+                    select: {
+                        id: true,
+                        user: {
+                            select: {
+                                id: true,
+                                name: true,
+                                phone: true,
+                            },
+                        },
+                    },
+                },
+                // Ordered products
+                items: {
+                    include: {
+                        product: {
+                            select: {
+                                id: true,
+                                name: true,
+                                price: true,
+                                images: true,
+                            },
+                        },
+                    },
+                },
             },
         }),
-        prisma_1.prisma.order.count({ where }),
+        prisma_1.prisma.order.count({
+            where,
+        }),
     ]);
-    console.log(`Orders: ${orders}`);
+    console.log(`Orders: ${orders.length}`);
     return {
         orders,
         pagination: {
@@ -538,6 +650,7 @@ async function riderAcceptOrder(orderId, riderUserId) {
             status: 'ACCEPTED',
             timestamp: new Date(),
         });
+        (0, socket_manager_1.notifyRiders)('delivery:taken', { orderId: order.id });
         return updated;
     });
 }

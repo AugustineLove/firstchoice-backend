@@ -10,8 +10,13 @@ export async function assignRider(req: Request, res: Response) {
       res.status(400).json({ success: false, message: 'riderId is required' });
       return;
     }
+    const deliveryId = (req.params.id || req.params.deliveryId) as string;
+    if (!deliveryId) {
+      res.status(400).json({ success: false, message: 'deliveryId is required' });
+      return;
+    }
     const delivery = await DeliveryService.assignRiderToDelivery(
-      req.params.id as string,
+      deliveryId,
       riderId
     );
     res.status(200).json({ success: true, data: delivery });

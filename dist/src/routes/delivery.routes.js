@@ -36,10 +36,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const DeliveryController = __importStar(require("../controllers/delivery.controller"));
 const auth_middleware_1 = require("../middleware/auth.middleware");
+const operating_hours_1 = require("../middleware/operating.hours");
 const deliveryRouter = (0, express_1.Router)();
 deliveryRouter.use(auth_middleware_1.authenticate);
 // Customer
-deliveryRouter.post('/', (0, auth_middleware_1.authorize)('CUSTOMER'), DeliveryController.createDelivery);
+deliveryRouter.post('/', (0, auth_middleware_1.authorize)('CUSTOMER'), operating_hours_1.requireOperatingHours, DeliveryController.createDelivery);
 deliveryRouter.get('/pending', (0, auth_middleware_1.authorize)('RIDER'), DeliveryController.getPendingDeliveries);
 // Customer, Rider, Admin
 deliveryRouter.get('/:id', DeliveryController.getDeliveryById);

@@ -7,3 +7,4 @@ export declare function changePassword(req: AuthRequest, res: Response): Promise
 export declare function getMyOrders(req: AuthRequest, res: Response): Promise<void>;
 export declare function getMyDeliveries(req: AuthRequest, res: Response): Promise<void>;
 export declare function getMyErrands(req: AuthRequest, res: Response): Promise<void>;
+export declare function deleteAccountHandler(req: AuthRequest, res: Response): Promise<Response<any, Record<string, any>> | undefined>;

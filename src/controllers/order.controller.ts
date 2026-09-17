@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import * as OrderService from '../services/order.service';
+import * as AdminService from '../services/admin.service';
 import { OrderStatus } from '@prisma/client';
 import { AuthRequest } from '../interface/auth-request.interface.ts';
 
@@ -55,12 +56,21 @@ export async function getOrderById(req: AuthRequest, res: Response) {
 
 export async function updateOrderStatus(req: AuthRequest, res: Response) {
   try {
-    
-    const { status } = req.body;
+    const { status, riderId } = req.body;
     console.log(status);
     if (!status) {
       console.log('not status');
       res.status(400).json({ success: false, message: 'status is required' });
+      return;
+    }
+
+    if (req.user?.role === 'ADMIN') {
+      const order = await AdminService.updateOrderStatusAdmin(
+        req.params.id as string,
+        status as OrderStatus,
+        { riderId }
+      );
+      res.status(200).json({ success: true, data: order });
       return;
     }
 

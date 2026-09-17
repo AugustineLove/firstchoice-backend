@@ -41,6 +41,7 @@ exports.getAllOrders = getAllOrders;
 exports.acceptOrder = acceptOrder;
 exports.uploadOrderImage = uploadOrderImage;
 const OrderService = __importStar(require("../services/order.service"));
+const AdminService = __importStar(require("../services/admin.service"));
 async function placeOrder(req, res) {
     try {
         const { vendorId, items, note, deliveryAddress, paymentMethod, recipientName, recipientPhone } = req.body;
@@ -86,15 +87,23 @@ async function getOrderById(req, res) {
 }
 async function updateOrderStatus(req, res) {
     try {
-        const { status } = req.body;
+        const { status, riderId } = req.body;
+        console.log(status);
         if (!status) {
+            console.log('not status');
             res.status(400).json({ success: false, message: 'status is required' });
+            return;
+        }
+        if (req.user?.role === 'ADMIN') {
+            const order = await AdminService.updateOrderStatusAdmin(req.params.id, status, { riderId });
+            res.status(200).json({ success: true, data: order });
             return;
         }
         const order = await OrderService.updateOrderStatus(req.params.id, req.user.id, status);
         res.status(200).json({ success: true, data: order });
     }
     catch (err) {
+        console.log(err);
         res.status(400).json({ success: false, message: err.message });
     }
 }
@@ -117,7 +126,6 @@ async function getAllOrders(req, res) {
             page: page ? parseInt(page) : 1,
             limit: limit ? parseInt(limit) : 20,
         });
-        console.log(`All orders: ${JSON.stringify(result)}`);
         res.status(200).json({ success: true, data: result });
     }
     catch (err) {

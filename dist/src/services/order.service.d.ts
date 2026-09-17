@@ -31,6 +31,11 @@ export declare function placeOrder(customerId: string, data: {
         businessName: string;
         logo: string | null;
     };
+    customer: {
+        name: string;
+        id: string;
+        phone: string;
+    };
 } & {
     id: string;
     createdAt: Date;
@@ -78,13 +83,13 @@ export declare function getOrderById(orderId: string, userId: string): Promise<{
     items: ({
         product: {
             name: string;
-            price: number;
             images: string[];
+            price: number;
         };
     } & {
         id: string;
-        orderId: string;
         productId: string;
+        orderId: string;
         quantity: number;
         unitPrice: number;
         selectedVariants: import("@prisma/client/runtime/library").JsonValue | null;
@@ -140,8 +145,8 @@ export declare function updateOrderStatus(orderId: string, userId: string, newSt
         };
     } & {
         id: string;
-        orderId: string;
         productId: string;
+        orderId: string;
         quantity: number;
         unitPrice: number;
         selectedVariants: import("@prisma/client/runtime/library").JsonValue | null;
@@ -209,24 +214,36 @@ export declare function getAllOrders(filters: {
         rider: {
             user: {
                 name: string;
+                id: string;
                 phone: string;
             };
+            id: string;
         } | null;
         vendor: {
+            id: string;
+            phone: string;
             businessName: string;
+            address: string;
+            logo: string | null;
         };
         customer: {
             name: string;
+            id: string;
             phone: string;
+            email: string | null;
+            role: import("@prisma/client").$Enums.Role;
         };
         items: ({
             product: {
                 name: string;
+                id: string;
+                images: string[];
+                price: number;
             };
         } & {
             id: string;
-            orderId: string;
             productId: string;
+            orderId: string;
             quantity: number;
             unitPrice: number;
             selectedVariants: import("@prisma/client/runtime/library").JsonValue | null;
@@ -265,10 +282,12 @@ export declare function getAllOrders(filters: {
         totalPages: number;
     };
 }>;
+export declare function emitOrderEvent(orderId: string, status: OrderStatus): Promise<void>;
 export declare function getOrdersReadyForPickup(): Promise<({
     rider: {
         id: string;
         createdAt: Date;
+        rating: number;
         userId: string;
         bikeType: string;
         licenseNumber: string | null;
@@ -276,7 +295,6 @@ export declare function getOrdersReadyForPickup(): Promise<({
         currentLatitude: number | null;
         currentLongitude: number | null;
         totalDeliveries: number;
-        rating: number;
         earnings: number;
     } | null;
     vendor: {
@@ -284,13 +302,13 @@ export declare function getOrdersReadyForPickup(): Promise<({
         phone: string;
         status: import("@prisma/client").$Enums.VendorStatus;
         createdAt: Date;
-        userId: string;
         rating: number;
+        userId: string;
         businessName: string;
         businessType: string;
         address: string;
         logo: string | null;
-        openingHours: string | null;
+        openingHours: import("@prisma/client/runtime/library").JsonValue | null;
         longitude: string | null;
         latitude: string | null;
     };
@@ -306,10 +324,14 @@ export declare function getOrdersReadyForPickup(): Promise<({
         createdAt: Date;
         updatedAt: Date;
         fcmToken: string | null;
+        webFcmToken: string | null;
         fcmUpdatedAt: Date | null;
         resetPasswordToken: string | null;
         resetPasswordExpiry: Date | null;
         firebaseUid: string | null;
+        telegramChatId: string | null;
+        telegramLinkCode: string | null;
+        telegramLinkCodeExpiry: Date | null;
     };
     items: ({
         product: {
@@ -319,9 +341,9 @@ export declare function getOrdersReadyForPickup(): Promise<({
             updatedAt: Date;
             vendorId: string;
             description: string | null;
+            images: string[];
             price: number;
             stock: number;
-            images: string[];
             category: string;
             available: boolean;
             preparationTime: number | null;
@@ -340,8 +362,8 @@ export declare function getOrdersReadyForPickup(): Promise<({
         };
     } & {
         id: string;
-        orderId: string;
         productId: string;
+        orderId: string;
         quantity: number;
         unitPrice: number;
         selectedVariants: import("@prisma/client/runtime/library").JsonValue | null;
@@ -382,6 +404,7 @@ export declare function riderAcceptOrder(orderId: string, riderUserId: string): 
     } & {
         id: string;
         createdAt: Date;
+        rating: number;
         userId: string;
         bikeType: string;
         licenseNumber: string | null;
@@ -389,7 +412,6 @@ export declare function riderAcceptOrder(orderId: string, riderUserId: string): 
         currentLatitude: number | null;
         currentLongitude: number | null;
         totalDeliveries: number;
-        rating: number;
         earnings: number;
     }) | null;
     vendor: {

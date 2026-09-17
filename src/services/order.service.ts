@@ -627,7 +627,7 @@ export async function getAllOrders(filters: {
   };
 }
 
-async function emitOrderEvent(orderId: string, status: OrderStatus) {
+export async function emitOrderEvent(orderId: string, status: OrderStatus) {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     select: {

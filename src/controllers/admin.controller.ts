@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import * as AdminService from '../services/admin.service';
 import * as NotificationService from '../services/notification.service';
-import { UserStatus, VendorStatus } from '@prisma/client';
+import { OrderStatus, UserStatus, VendorStatus } from '@prisma/client';
 import { getRiderInsights, getRiderJobsPaginated } from '../services/rider.service';
 
 
@@ -160,6 +160,71 @@ export async function assignRiderToOrder(req: Request, res: Response) {
     const order = await AdminService.assignRiderToOrder(
       req.params.orderId as string,
       riderId
+    );
+    res.status(200).json({ success: true, data: order });
+  } catch (err: any) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+}
+
+export async function assignRiderToDelivery(req: Request, res: Response) {
+  try {
+    const { riderId } = req.body;
+    const deliveryId = (req.params.deliveryId || req.params.id) as string;
+
+    if (!deliveryId) {
+      res.status(400).json({ success: false, message: 'deliveryId is required' });
+      return;
+    }
+
+    if (!riderId) {
+      res.status(400).json({ success: false, message: 'riderId is required' });
+      return;
+    }
+
+    const delivery = await AdminService.assignRiderToDelivery(
+      deliveryId,
+      riderId
+    );
+    res.status(200).json({ success: true, data: delivery });
+  } catch (err: any) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+}
+
+export async function updateOrderStatus(req: Request, res: Response) {
+  try {
+    const { status, riderId } = req.body;
+    const orderId = (req.params.orderId || req.params.id) as string;
+
+    if (!orderId) {
+      res.status(400).json({ success: false, message: 'orderId is required' });
+      return;
+    }
+
+    const validStatuses: OrderStatus[] = [
+      'PENDING',
+      'ACCEPTED',
+      'RIDER_ASSIGNED',
+      'PICKED_UP',
+      'IN_TRANSIT',
+      'ARRIVED',
+      'DELIVERED',
+      'CANCELLED',
+    ];
+
+    if (!status || !validStatuses.includes(status)) {
+      res.status(400).json({
+        success: false,
+        message: `status is required and must be one of: ${validStatuses.join(', ')}`,
+      });
+      return;
+    }
+
+    const order = await AdminService.updateOrderStatusAdmin(
+      orderId,
+      status as OrderStatus,
+      { riderId }
     );
     res.status(200).json({ success: true, data: order });
   } catch (err: any) {

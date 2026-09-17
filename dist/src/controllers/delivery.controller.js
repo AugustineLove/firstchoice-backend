@@ -50,7 +50,12 @@ async function assignRider(req, res) {
             res.status(400).json({ success: false, message: 'riderId is required' });
             return;
         }
-        const delivery = await DeliveryService.assignRiderToDelivery(req.params.id, riderId);
+        const deliveryId = (req.params.id || req.params.deliveryId);
+        if (!deliveryId) {
+            res.status(400).json({ success: false, message: 'deliveryId is required' });
+            return;
+        }
+        const delivery = await DeliveryService.assignRiderToDelivery(deliveryId, riderId);
         res.status(200).json({ success: true, data: delivery });
     }
     catch (err) {
@@ -60,13 +65,14 @@ async function assignRider(req, res) {
 async function createDelivery(req, res) {
     try {
         const { pickupAddress, destinationAddress, itemDescription, paymentMethod, recipientName, recipientPhone, imageUrl, } = req.body;
-        if (!pickupAddress || !destinationAddress || !itemDescription) {
-            res.status(400).json({
-                success: false,
-                message: 'pickupAddress, destinationAddress and itemDescription are required',
-            });
-            return;
-        }
+        console.log(req.body);
+        // if (!pickupAddress || !destinationAddress || !itemDescription) {
+        //   res.status(400).json({
+        //     success: false,
+        //     message: 'pickupAddress, destinationAddress and itemDescription are required',
+        //   });
+        //   return;
+        // }
         if (!paymentMethod || !['CASH', 'MOMO'].includes(paymentMethod)) {
             res.status(400).json({ success: false, message: 'paymentMethod must be CASH or MOMO' });
             return;
@@ -81,6 +87,7 @@ async function createDelivery(req, res) {
         res.status(201).json({ success: true, data: delivery });
     }
     catch (err) {
+        console.log(err);
         res.status(400).json({ success: false, message: err.message });
     }
 }

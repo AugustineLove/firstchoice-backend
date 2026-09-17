@@ -5,19 +5,26 @@ interface VariantGroupInput {
         name: string;
         priceAdjustment?: number;
         available?: boolean;
+        images?: string[];
     }[];
+}
+type IncrementMode = 'multiple' | 'free' | 'halves' | 'custom';
+interface AddonInput {
+    name: string;
+    price?: number;
+    available?: boolean;
+    incrementable?: boolean;
+    incrementMode?: IncrementMode | string;
+    customIncrementValue?: number;
 }
 interface AddonGroupInput {
     name: string;
     minSelect?: number;
     maxSelect?: number;
-    addons: {
-        name: string;
-        price?: number;
-        available?: boolean;
-    }[];
+    addons: AddonInput[];
     incrementable?: boolean;
     incrementMode?: string;
+    customIncrementValue?: number;
 }
 interface AttributeInput {
     key: string;
@@ -51,6 +58,7 @@ interface CreateProductInput {
 export declare function createProduct(userId: string, data: CreateProductInput): Promise<{
     vendor: {
         id: string;
+        phone: string;
         rating: number;
         businessName: string;
         businessType: string;
@@ -61,6 +69,7 @@ export declare function createProduct(userId: string, data: CreateProductInput):
         variants: {
             name: string;
             id: string;
+            images: string[];
             available: boolean;
             groupId: string;
             priceAdjustment: number;
@@ -79,6 +88,7 @@ export declare function createProduct(userId: string, data: CreateProductInput):
             available: boolean;
             incrementable: boolean;
             incrementMode: string | null;
+            customIncrementValue: number | null;
             groupId: string;
         }[];
     } & {
@@ -89,6 +99,7 @@ export declare function createProduct(userId: string, data: CreateProductInput):
         maxSelect: number;
         incrementable: boolean;
         incrementMode: string | null;
+        customIncrementValue: number | null;
     })[];
     attributes: {
         id: string;
@@ -103,9 +114,9 @@ export declare function createProduct(userId: string, data: CreateProductInput):
     updatedAt: Date;
     vendorId: string;
     description: string | null;
+    images: string[];
     price: number;
     stock: number;
-    images: string[];
     category: string;
     available: boolean;
     preparationTime: number | null;
@@ -125,6 +136,7 @@ export declare function createProduct(userId: string, data: CreateProductInput):
 export declare function updateProduct(userId: string, productId: string, data: Partial<CreateProductInput>): Promise<({
     vendor: {
         id: string;
+        phone: string;
         rating: number;
         businessName: string;
         businessType: string;
@@ -135,6 +147,7 @@ export declare function updateProduct(userId: string, productId: string, data: P
         variants: {
             name: string;
             id: string;
+            images: string[];
             available: boolean;
             groupId: string;
             priceAdjustment: number;
@@ -153,6 +166,7 @@ export declare function updateProduct(userId: string, productId: string, data: P
             available: boolean;
             incrementable: boolean;
             incrementMode: string | null;
+            customIncrementValue: number | null;
             groupId: string;
         }[];
     } & {
@@ -163,6 +177,7 @@ export declare function updateProduct(userId: string, productId: string, data: P
         maxSelect: number;
         incrementable: boolean;
         incrementMode: string | null;
+        customIncrementValue: number | null;
     })[];
     attributes: {
         id: string;
@@ -177,9 +192,9 @@ export declare function updateProduct(userId: string, productId: string, data: P
     updatedAt: Date;
     vendorId: string;
     description: string | null;
+    images: string[];
     price: number;
     stock: number;
-    images: string[];
     category: string;
     available: boolean;
     preparationTime: number | null;
@@ -202,6 +217,7 @@ export declare function deleteProduct(userId: string, productId: string): Promis
 export declare function getProductById(productId: string): Promise<{
     vendor: {
         id: string;
+        phone: string;
         rating: number;
         businessName: string;
         businessType: string;
@@ -212,6 +228,7 @@ export declare function getProductById(productId: string): Promise<{
         variants: {
             name: string;
             id: string;
+            images: string[];
             available: boolean;
             groupId: string;
             priceAdjustment: number;
@@ -230,6 +247,7 @@ export declare function getProductById(productId: string): Promise<{
             available: boolean;
             incrementable: boolean;
             incrementMode: string | null;
+            customIncrementValue: number | null;
             groupId: string;
         }[];
     } & {
@@ -240,6 +258,7 @@ export declare function getProductById(productId: string): Promise<{
         maxSelect: number;
         incrementable: boolean;
         incrementMode: string | null;
+        customIncrementValue: number | null;
     })[];
     attributes: {
         id: string;
@@ -254,9 +273,9 @@ export declare function getProductById(productId: string): Promise<{
     updatedAt: Date;
     vendorId: string;
     description: string | null;
+    images: string[];
     price: number;
     stock: number;
-    images: string[];
     category: string;
     available: boolean;
     preparationTime: number | null;
@@ -276,6 +295,7 @@ export declare function getProductById(productId: string): Promise<{
 export declare function getProductsByVendor(vendorId: string): Promise<({
     vendor: {
         id: string;
+        phone: string;
         rating: number;
         businessName: string;
         businessType: string;
@@ -286,6 +306,7 @@ export declare function getProductsByVendor(vendorId: string): Promise<({
         variants: {
             name: string;
             id: string;
+            images: string[];
             available: boolean;
             groupId: string;
             priceAdjustment: number;
@@ -304,6 +325,7 @@ export declare function getProductsByVendor(vendorId: string): Promise<({
             available: boolean;
             incrementable: boolean;
             incrementMode: string | null;
+            customIncrementValue: number | null;
             groupId: string;
         }[];
     } & {
@@ -314,6 +336,7 @@ export declare function getProductsByVendor(vendorId: string): Promise<({
         maxSelect: number;
         incrementable: boolean;
         incrementMode: string | null;
+        customIncrementValue: number | null;
     })[];
     attributes: {
         id: string;
@@ -328,9 +351,9 @@ export declare function getProductsByVendor(vendorId: string): Promise<({
     updatedAt: Date;
     vendorId: string;
     description: string | null;
+    images: string[];
     price: number;
     stock: number;
-    images: string[];
     category: string;
     available: boolean;
     preparationTime: number | null;
@@ -350,6 +373,7 @@ export declare function getProductsByVendor(vendorId: string): Promise<({
 export declare function getMyProducts(userId: string): Promise<({
     vendor: {
         id: string;
+        phone: string;
         rating: number;
         businessName: string;
         businessType: string;
@@ -360,6 +384,7 @@ export declare function getMyProducts(userId: string): Promise<({
         variants: {
             name: string;
             id: string;
+            images: string[];
             available: boolean;
             groupId: string;
             priceAdjustment: number;
@@ -378,6 +403,7 @@ export declare function getMyProducts(userId: string): Promise<({
             available: boolean;
             incrementable: boolean;
             incrementMode: string | null;
+            customIncrementValue: number | null;
             groupId: string;
         }[];
     } & {
@@ -388,6 +414,7 @@ export declare function getMyProducts(userId: string): Promise<({
         maxSelect: number;
         incrementable: boolean;
         incrementMode: string | null;
+        customIncrementValue: number | null;
     })[];
     attributes: {
         id: string;
@@ -402,9 +429,9 @@ export declare function getMyProducts(userId: string): Promise<({
     updatedAt: Date;
     vendorId: string;
     description: string | null;
+    images: string[];
     price: number;
     stock: number;
-    images: string[];
     category: string;
     available: boolean;
     preparationTime: number | null;
@@ -424,6 +451,7 @@ export declare function getMyProducts(userId: string): Promise<({
 export declare function searchProducts(query: string, category?: string): Promise<({
     vendor: {
         id: string;
+        phone: string;
         rating: number;
         businessName: string;
         businessType: string;
@@ -434,6 +462,7 @@ export declare function searchProducts(query: string, category?: string): Promis
         variants: {
             name: string;
             id: string;
+            images: string[];
             available: boolean;
             groupId: string;
             priceAdjustment: number;
@@ -452,6 +481,7 @@ export declare function searchProducts(query: string, category?: string): Promis
             available: boolean;
             incrementable: boolean;
             incrementMode: string | null;
+            customIncrementValue: number | null;
             groupId: string;
         }[];
     } & {
@@ -462,6 +492,7 @@ export declare function searchProducts(query: string, category?: string): Promis
         maxSelect: number;
         incrementable: boolean;
         incrementMode: string | null;
+        customIncrementValue: number | null;
     })[];
     attributes: {
         id: string;
@@ -476,9 +507,9 @@ export declare function searchProducts(query: string, category?: string): Promis
     updatedAt: Date;
     vendorId: string;
     description: string | null;
+    images: string[];
     price: number;
     stock: number;
-    images: string[];
     category: string;
     available: boolean;
     preparationTime: number | null;
@@ -503,6 +534,7 @@ export declare function addAddonGroup(userId: string, productId: string, data: A
         available: boolean;
         incrementable: boolean;
         incrementMode: string | null;
+        customIncrementValue: number | null;
         groupId: string;
     }[];
 } & {
@@ -513,6 +545,7 @@ export declare function addAddonGroup(userId: string, productId: string, data: A
     maxSelect: number;
     incrementable: boolean;
     incrementMode: string | null;
+    customIncrementValue: number | null;
 }>;
 export declare function deleteAddonGroup(userId: string, groupId: string): Promise<{
     message: string;
@@ -521,6 +554,7 @@ export declare function addVariantGroup(userId: string, productId: string, data:
     variants: {
         name: string;
         id: string;
+        images: string[];
         available: boolean;
         groupId: string;
         priceAdjustment: number;
@@ -531,4 +565,10 @@ export declare function addVariantGroup(userId: string, productId: string, data:
     productId: string;
     required: boolean;
 }>;
+export declare function calculateAddonPrice(addon: {
+    price: number;
+    incrementable: boolean;
+    incrementMode: string | null;
+    customIncrementValue: number | null;
+}, qty: number): number;
 export {};

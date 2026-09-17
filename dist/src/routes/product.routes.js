@@ -35,16 +35,23 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const ProductController = __importStar(require("../controllers/product.controller"));
+const ProductReviewController = __importStar(require("../controllers/productreview.controller"));
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const productRouter = (0, express_1.Router)();
 // Public
 productRouter.get('/search', ProductController.searchProducts);
 productRouter.get('/vendor/:vendorId', ProductController.getProductsByVendor);
-productRouter.get('/:id', ProductController.getProductById);
+// Reviews
+productRouter.get('/:id/reviews', ProductReviewController.getProductReviews);
+productRouter.get('/:id/reviews/summary', ProductReviewController.getProductReviewSummary);
+productRouter.post('/:id/reviews', auth_middleware_1.authenticate, ProductReviewController.submitReview);
+productRouter.delete('/reviews/:reviewId', auth_middleware_1.authenticate, ProductReviewController.deleteReview);
 // Vendor only
 productRouter.post('/', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)('VENDOR'), ProductController.createProduct);
-productRouter.get('/me/all', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)('VENDOR'), ProductController.getMyProducts);
-productRouter.patch('/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)('VENDOR'), ProductController.updateProduct);
-productRouter.delete('/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)('VENDOR'), ProductController.deleteProduct);
+productRouter.get('/me/all', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)('VENDOR', 'ADMIN'), ProductController.getMyProducts);
+productRouter.patch('/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)('VENDOR', 'ADMIN'), ProductController.updateProduct);
+productRouter.delete('/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)('VENDOR', 'ADMIN'), ProductController.deleteProduct);
+// Keep this LAST
+productRouter.get('/:id', ProductController.getProductById);
 exports.default = productRouter;
 //# sourceMappingURL=product.routes.js.map

@@ -50,53 +50,108 @@ const prisma_1 = require("../config/prisma");
 const socket_manager_1 = require("../socket/socket.manager");
 const NotificationService = __importStar(require("./notification.service"));
 const socket_manager_2 = require("../socket/socket.manager");
-function calculateDeliveryEstimate(pickupLat, pickupLng, destLat, destLng) {
-    if (pickupLat && pickupLng && destLat && destLng) {
-        const R = 6371;
-        const dLat = ((destLat - pickupLat) * Math.PI) / 180;
-        const dLng = ((destLng - pickupLng) * Math.PI) / 180;
-        const a = Math.sin(dLat / 2) ** 2 +
-            Math.cos((pickupLat * Math.PI) / 180) *
-                Math.cos((destLat * Math.PI) / 180) *
-                Math.sin(dLng / 2) ** 2;
-        const km = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        if (km <= 1)
-            return 5;
-        if (km <= 1.5)
-            return 6;
-        if (km <= 2)
-            return 7;
-        if (km <= 2.5)
-            return 8;
-        if (km <= 3)
-            return 9;
-        if (km <= 3.5)
-            return 10;
-        if (km <= 4)
-            return 11;
-        if (km <= 4.5)
-            return 12;
-        if (km <= 5)
-            return 13;
-        if (km <= 5.5)
-            return 14;
-        if (km <= 6)
-            return 15;
-        if (km <= 6.5)
-            return 16;
-        if (km <= 7)
-            return 17;
-        if (km <= 7.5)
-            return 18;
-        if (km <= 8)
-            return 19;
-        if (km <= 8.5)
-            return 20;
-        if (km <= 9)
-            return 21;
-        return 25;
+const constants_1 = require("../utils/constants");
+const message_service_1 = require("./message.service");
+const setting_service_1 = require("./setting.service");
+const admin_service_1 = require("./admin.service");
+// function calculateDeliveryEstimate(
+//   pickupLat?: number,
+//   pickupLng?: number,
+//   destLat?: number,
+//   destLng?: number,
+// ): number {
+//   if (pickupLat && pickupLng && destLat && destLng) {
+//     const R = 6371;
+//     const dLat = ((destLat - pickupLat) * Math.PI) / 180;
+//     const dLng = ((destLng - pickupLng) * Math.PI) / 180;
+//     const a =
+//       Math.sin(dLat / 2) ** 2 +
+//       Math.cos((pickupLat * Math.PI) / 180) *
+//         Math.cos((destLat * Math.PI) / 180) *
+//         Math.sin(dLng / 2) ** 2;
+//     const km = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//     if (km <= 1) return 5;
+//   if (km <= 1.5) return 6;
+//   if (km <= 2) return 7;
+//   if (km <= 2.5) return 8;
+//   if (km <= 3) return 9;
+//   if (km <= 3.5) return 10;
+//   if (km <= 4) return 11;
+//   if (km <= 4.5) return 12;
+//   if (km <= 5) return 13;
+//   if (km <= 5.5) return 14;
+//   if (km <= 6) return 15;
+//   if (km <= 6.5) return 16;
+//   if (km <= 7) return 17;
+//   if (km <= 7.5) return 18;
+//   if (km <= 8) return 19;
+//   if (km <= 8.5) return 20;
+//   if (km <= 9) return 21;
+//   if (km <= 9.5) return 22;
+//   if (km <= 10) return 23;
+//   if (km <= 10.5) return 24;
+//   if (km <= 11) return 25;
+//   if (km <= 11.5) return 26;
+//   if (km <= 12) return 27;
+//   if (km <= 12.5) return 28;
+//   if (km <= 13) return 29;
+//   if (km <= 13.5) return 30;
+//   if (km <= 14) return 31;
+//   if (km <= 14.5) return 32;
+//   if (km <= 15) return 33;
+//   if (km <= 15.5) return 34;
+//   if (km <= 16) return 35;
+//   if (km <= 16.5) return 36;
+//   if (km <= 17) return 37;
+//   if (km <= 17.5) return 38;
+//   if (km <= 18) return 39;
+//   if (km <= 18.5) return 40;
+//   if (km <= 19) return 41;
+//   if (km <= 19.5) return 42;
+//   if (km <= 20) return 43;
+//   if (km <= 20.5) return 44;
+//   if (km <= 21) return 45;
+//   if (km <= 21.5) return 46;
+//   if (km <= 22) return 47;
+//   if (km <= 22.5) return 48;
+//   if (km <= 23) return 49;
+//   return 50;
+//   }
+//   return 0;
+// }
+const _kBaseFeeGhs = 5;
+const _kPerKmGhs = 2;
+function calculateDeliveryEstimate({ pickupLat, pickupLng, destLat, destLng, }) {
+    if (pickupLat == null ||
+        pickupLng == null ||
+        destLat == null ||
+        destLng == null) {
+        return 10; // fallback flat fee if coords missing
     }
-    return 0;
+    const earthRadiusKm = 6371.0;
+    const toRad = (degrees) => (degrees * Math.PI) / 180;
+    const dLat = toRad(destLat - pickupLat);
+    const dLng = toRad(destLng - pickupLng);
+    const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(pickupLat)) *
+            Math.cos(toRad(destLat)) *
+            Math.sin(dLng / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distanceKm = earthRadiusKm * c;
+    const fee = _kBaseFeeGhs + distanceKm * _kPerKmGhs;
+    return Math.round(fee);
+}
+function calculateErrandFee(mode, fixedPrice, perItemPrice, itemCount) {
+    if (mode === 'PER_ITEM')
+        return Math.max(itemCount, 0) * perItemPrice;
+    return fixedPrice;
+}
+function summarizeErrandItems(items) {
+    if (items.length === 0)
+        return 'Errand request';
+    const shown = items.slice(0, 3).map((i) => i.text).join(', ');
+    const extra = items.length > 3 ? ` +${items.length - 3} more` : '';
+    return `Errand: ${shown}${extra}`;
 }
 async function getDeliveryById(deliveryId, userId) {
     const delivery = await prisma_1.prisma.deliveryRequest.findUnique({
@@ -132,43 +187,7 @@ const validDeliveryTransitions = {
     CANCELLED: [],
 };
 async function assignRiderToDelivery(deliveryId, riderId) {
-    const delivery = await prisma_1.prisma.deliveryRequest.findUnique({
-        where: { id: deliveryId },
-    });
-    if (!delivery)
-        throw new Error('Delivery request not found');
-    if (delivery.status !== 'PENDING')
-        throw new Error('Can only assign rider to a pending delivery');
-    const rider = await prisma_1.prisma.rider.findUnique({ where: { id: riderId } });
-    if (!rider)
-        throw new Error('Rider not found');
-    if (rider.availability !== 'ONLINE')
-        throw new Error('Rider is not available');
-    return prisma_1.prisma.$transaction(async (tx) => {
-        const updated = await tx.deliveryRequest.update({
-            where: { id: deliveryId },
-            data: {
-                assignedRiderId: riderId,
-                status: 'ACCEPTED',
-            },
-            include: {
-                customer: { select: { name: true, phone: true } },
-                rider: {
-                    include: { user: { select: { name: true, phone: true } } },
-                },
-            },
-        });
-        await tx.rider.update({
-            where: { id: riderId },
-            data: { availability: 'BUSY' },
-        });
-        (0, socket_manager_1.notifyUser)(delivery.customerId, 'delivery:rider_assigned', {
-            deliveryId,
-            riderId,
-            timestamp: new Date(),
-        });
-        return updated;
-    });
+    return (0, admin_service_1.assignRiderToDelivery)(deliveryId, riderId);
 }
 async function getAllDeliveries(filters) {
     const page = filters.page || 1;
@@ -232,47 +251,99 @@ async function deleteLocation(id) {
 }
 // ─── CREATE ──────────────────────────────────────────────
 async function createDeliveryRequest(customerId, data) {
-    const estimatedFee = calculateDeliveryEstimate(data.pickupLatitude, data.pickupLongitude, data.destinationLatitude, data.destinationLongitude);
+    const type = data.type === 'ERRAND' ? 'ERRAND' : 'PICKUP';
+    let pickupAddress = data.pickupAddress?.trim() || '';
+    let pickupLatitude = data.pickupLatitude;
+    let pickupLongitude = data.pickupLongitude;
+    let itemDescription = data.itemDescription?.trim() || '';
+    let errandItemsClean = [];
+    let errandFee = 0;
+    let itemsEstimatedTotal = 0;
+    if (type === 'ERRAND') {
+        const settings = await (0, setting_service_1.getSettings)();
+        if (!settings.errandPickupLocation) {
+            throw new Error('Errand pickup location has not been configured yet. Please contact support.');
+        }
+        errandItemsClean = (data.errandItems || [])
+            .map((it) => ({
+            text: (it.text || '').trim(),
+            estimatedPrice: Math.max(0, Number(it.estimatedPrice) || 0),
+        }))
+            .filter((it) => it.text.length > 0);
+        if (errandItemsClean.length === 0) {
+            throw new Error('Please add at least one item to the errand list.');
+        }
+        pickupAddress = settings.errandPickupLocation.address;
+        pickupLatitude = settings.errandPickupLocation.latitude;
+        pickupLongitude = settings.errandPickupLocation.longitude;
+        itemDescription = summarizeErrandItems(errandItemsClean);
+        itemsEstimatedTotal = errandItemsClean.reduce((sum, it) => sum + it.estimatedPrice, 0);
+        errandFee = calculateErrandFee(settings.errandPricingMode, settings.errandFixedPrice, settings.errandPerItemPrice, errandItemsClean.length);
+    }
+    else {
+        if (!pickupAddress)
+            throw new Error('Pickup address is required.');
+        if (!itemDescription)
+            throw new Error('Item description is required.');
+    }
+    const deliveryFee = calculateDeliveryEstimate({
+        pickupLat: pickupLatitude,
+        pickupLng: pickupLongitude,
+        destLat: data.destinationLatitude,
+        destLng: data.destinationLongitude,
+    });
+    const estimatedFee = deliveryFee + errandFee; // service fee only — items cost tracked separately
     const delivery = await prisma_1.prisma.deliveryRequest.create({
         data: {
             customerId,
-            pickupAddress: data.pickupAddress.trim(),
-            pickupLatitude: data.pickupLatitude,
-            pickupLongitude: data.pickupLongitude,
+            type,
+            pickupAddress,
+            pickupLatitude,
+            pickupLongitude,
             destinationAddress: data.destinationAddress.trim(),
             destinationLatitude: data.destinationLatitude,
             destinationLongitude: data.destinationLongitude,
-            itemDescription: data.itemDescription.trim(),
+            itemDescription,
+            errandItems: type === 'ERRAND' ? errandItemsClean : undefined,
+            itemsEstimatedTotal,
+            deliveryFee,
+            errandFee,
             estimatedFee,
             paymentMethod: data.paymentMethod,
             recipientName: data.recipientName?.trim() || null,
             recipientPhone: data.recipientPhone?.trim() || null,
             imageUrl: data.imageUrl || null,
         },
-        include: {
-            customer: { select: { name: true, phone: true } },
-        },
+        include: { customer: { select: { name: true, phone: true } } },
     });
+    const itemsLine = type === 'ERRAND'
+        ? `\nErrand list:\n${errandItemsClean.map((it) => `- ${it.text} (~GHS ${it.estimatedPrice.toFixed(2)})`).join('\n')}\nEstimated items cost: GHS ${itemsEstimatedTotal.toFixed(2)}`
+        : `\nItem: ${itemDescription}`;
     const payload = {
-        type: 'NEW_DELIVERY',
+        type: type === 'ERRAND' ? 'NEW_ERRAND' : 'NEW_DELIVERY',
         deliveryId: delivery.id,
+        kind: type,
         pickupAddress: delivery.pickupAddress,
         destinationAddress: delivery.destinationAddress,
         itemDescription: delivery.itemDescription,
-        estimatedFee: delivery.estimatedFee,
+        errandItems: type === 'ERRAND' ? errandItemsClean : undefined,
+        itemsEstimatedTotal,
+        deliveryFee, errandFee, estimatedFee: delivery.estimatedFee,
         paymentMethod: delivery.paymentMethod,
         recipientName: delivery.recipientName,
         recipientPhone: delivery.recipientPhone,
         imageUrl: delivery.imageUrl,
-        customer: {
-            name: delivery.customer.name,
-            phone: delivery.customer.phone,
-        },
+        customer: { name: delivery.customer.name, phone: delivery.customer.phone },
         createdAt: delivery.createdAt,
     };
     (0, socket_manager_2.notifyRiders)('delivery:new_request', payload);
     (0, socket_manager_1.notifyAdmins)('admin:new_delivery', payload);
     await NotificationService.notifyNewDelivery(delivery.id);
+    (0, message_service_1.sendCustomerMessage)({
+        messageTo: constants_1.LOGISTICS_MANAGER_NUMBERS,
+        messageFrom: 'FirstChoice',
+        message: `New ${type === 'ERRAND' ? 'errand' : 'delivery'} request from ${delivery.customer.name}: ${delivery.pickupAddress} → ${delivery.destinationAddress}. Service fee: GHS ${delivery.estimatedFee} (delivery GHS ${deliveryFee} + errand GHS ${errandFee}).${itemsLine}\nPhone: ${delivery.customer.phone}`,
+    });
     return delivery;
 }
 // ─── RIDER SELF-ACCEPT ────────────────────────────────────
@@ -339,7 +410,7 @@ async function riderAcceptDelivery(deliveryId, riderUserId) {
 const validTransitions = {
     PENDING: ['ACCEPTED', 'CANCELLED'],
     ACCEPTED: ['PICKED_UP', 'CANCELLED'],
-    PICKED_UP: ['IN_TRANSIT'],
+    PICKED_UP: ['IN_TRANSIT', 'CANCELLED'], // ← was [] before, now cancellable
     IN_TRANSIT: ['DELIVERED'],
     DELIVERED: [],
     CANCELLED: [],
@@ -363,9 +434,10 @@ async function updateDeliveryStatus(deliveryId, userId, newStatus) {
     if (newStatus === 'CANCELLED') {
         const isCustomer = delivery.customerId === userId;
         const isAdmin = user.role === 'ADMIN';
-        if (!isCustomer && !isAdmin)
-            throw new Error('Only the customer or admin can cancel');
-        if (!['PENDING', 'ACCEPTED'].includes(delivery.status))
+        const isAssignedRider = !!rider && rider.id === delivery.assignedRiderId;
+        if (!isCustomer && !isAdmin && !isAssignedRider)
+            throw new Error('Only the customer, admin, or assigned rider can cancel');
+        if (!['PENDING', 'ACCEPTED', 'PICKED_UP'].includes(delivery.status))
             throw new Error('This delivery can no longer be cancelled');
     }
     const allowed = validTransitions[delivery.status];

@@ -35,12 +35,16 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const AdminController = __importStar(require("../controllers/admin.controller"));
+const SettingsController = __importStar(require("../controllers/settings.controller"));
 const auth_middleware_1 = require("../middleware/auth.middleware");
+const settings_controller_1 = require("../controllers/settings.controller");
+const setting_service_1 = require("../services/setting.service");
 const adminRouter = (0, express_1.Router)();
 // All admin routes — locked to ADMIN role
 adminRouter.use(auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)('ADMIN'));
 // Overview
 adminRouter.get('/stats', AdminController.getOverviewStats);
+adminRouter.get('/overview', AdminController.overview);
 // Users
 adminRouter.get('/users', AdminController.getAllUsers);
 adminRouter.patch('/users/:userId/status', AdminController.updateUserStatus);
@@ -54,12 +58,65 @@ adminRouter.patch('/vendors/:vendorId', AdminController.updateVendorProfile); //
 adminRouter.patch('/vendors/:vendorId/status', AdminController.updateVendorStatus);
 adminRouter.post('/vendors/:vendorId/products', AdminController.addVendorProduct); // NEW
 adminRouter.delete('/products/:productId', AdminController.deleteVendorProduct); // NEW
+// Settings
+adminRouter.get('/settings', settings_controller_1.getAdminSettings);
+adminRouter.patch('/settings', settings_controller_1.patchAdminSettings);
+adminRouter.get('/riders/:id/insights', AdminController.riderInsights);
+adminRouter.get('/riders/:id/jobs', AdminController.riderJobHistory);
 // Riders
 adminRouter.get('/riders', AdminController.getAllRiders);
-// Order assignment
+// Order assignment & status
 adminRouter.patch('/orders/:orderId/assign', AdminController.assignRiderToOrder);
+adminRouter.patch('/orders/:orderId/status', AdminController.updateOrderStatus);
+// Delivery assignment
+adminRouter.patch('/deliveries/:deliveryId/assign', AdminController.assignRiderToDelivery);
 // Analytics
 adminRouter.get('/analytics/orders', AdminController.getOrderAnalytics);
 adminRouter.get('/analytics/riders', AdminController.getRiderAnalytics);
+// Broadcast notifications
+adminRouter.post('/broadcast', AdminController.broadcastNotification);
+adminRouter.patch('/admin/closing-status', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)('ADMIN'), async (req, res) => {
+    try {
+        const { isClosed, closedMessage } = req.body;
+        if (typeof isClosed !== 'boolean') {
+            return res.status(400).json({
+                success: false,
+                message: 'isClosed must be a boolean'
+            });
+        }
+        if (isClosed && typeof closedMessage !== 'string') {
+            return res.status(400).json({
+                success: false,
+                message: 'closedMessage is required when closing'
+            });
+        }
+        if (isClosed && closedMessage && closedMessage.length > 500) {
+            return res.status(400).json({
+                success: false,
+                message: 'Message cannot exceed 500 characters'
+            });
+        }
+        const settings = await (0, setting_service_1.updateClosingStatus)(isClosed, closedMessage);
+        res.json({
+            success: true,
+            data: {
+                isClosed: settings.isClosed,
+                closedMessage: settings.closedMessage,
+            }
+        });
+    }
+    catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error
+        });
+    }
+});
+// Operating hours and override
+adminRouter.patch('/operating-hours', (0, auth_middleware_1.authorize)('ADMIN'), SettingsController.updateOperatingHours);
+adminRouter.post('/operating-override', (0, auth_middleware_1.authorize)('ADMIN'), SettingsController.setOperatingOverride);
+adminRouter.delete('/operating-override', (0, auth_middleware_1.authorize)('ADMIN'), SettingsController.clearOperatingOverride);
+// Report generation
+adminRouter.get('/reports/riders/daily', AdminController.riderDailyReport);
 exports.default = adminRouter;
 //# sourceMappingURL=admin.routes.js.map

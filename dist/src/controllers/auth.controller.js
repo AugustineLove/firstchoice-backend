@@ -130,15 +130,24 @@ async function resetPasswordEmail(req, res) {
     const error = (0, auth_validator_1.validateResetPassword)(req.body);
     console.log(`Error: ${error}`);
     if (error) {
-        res.status(400).json({ success: false, message: error });
+        res.status(400).json({
+            success: false,
+            message: error,
+        });
         return;
     }
     try {
-        await AuthService.resetPasswordEmail(req.body.phone);
-        res.status(200).json({ success: true, message: 'Password reset successfully' });
+        const result = await AuthService.resetPasswordEmail(req.body.phone);
+        res.status(200).json({
+            success: true,
+            data: result,
+        });
     }
     catch (err) {
-        res.status(400).json({ success: false, message: err.message });
+        res.status(400).json({
+            success: false,
+            message: err.message,
+        });
     }
 }
 // export async function forgotPassword(req: Request, res: Response) {

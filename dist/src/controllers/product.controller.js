@@ -64,7 +64,13 @@ async function updateProduct(req, res) {
         res.status(200).json({ success: true, data: product });
     }
     catch (err) {
-        res.status(400).json({ success: false, message: err.message });
+        console.error("UPDATE PRODUCT ERROR:", err);
+        console.error("MESSAGE:", err?.message);
+        console.error("STACK:", err?.stack);
+        res.status(500).json({
+            success: false,
+            message: err?.message || "Failed to update product",
+        });
     }
 }
 async function deleteProduct(req, res) {

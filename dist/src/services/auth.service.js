@@ -73,14 +73,13 @@ async function registerUser(data) {
     return { user, ...tokens };
 }
 async function loginUser(data) {
-    console.log(data);
-    const rawUser = await prisma_1.prisma.user.findUnique({
-        where: { phone: data.phone },
-    });
+    const rawUser = await prisma_1.prisma.user.findUnique({ where: { phone: data.phone } });
     if (!rawUser)
         throw new Error('Invalid phone number or password');
     if (rawUser.status === 'SUSPENDED')
         throw new Error('Your account has been suspended');
+    if (rawUser.status === 'DELETED')
+        throw new Error('Invalid phone number or password'); // don't reveal it existed
     const isMatch = await bcryptjs_1.default.compare(data.password, rawUser.passwordHash);
     if (!isMatch)
         throw new Error('Invalid phone number or password');
@@ -96,6 +95,8 @@ async function refreshAccessToken(token) {
             throw new Error('User not found');
         if (user.status === 'SUSPENDED')
             throw new Error('Account suspended');
+        if (user.status === 'DELETED')
+            throw new Error('Account no longer exists');
         const accessToken = jsonwebtoken_1.default.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '15m' });
         return { accessToken };
     }
@@ -150,8 +151,6 @@ async function resetPasswordEmail(phone) {
         throw new Error("No email associated with this account");
     }
     const token = crypto_1.default.randomBytes(32).toString("hex");
-    const hashedToken = await bcryptjs_1.default.hash(token, 10);
-    console.log(`Token: ${token}, HashedToken: ${hashedToken}`);
     await prisma_1.prisma.user.update({
         where: { id: user.id },
         data: {
@@ -160,10 +159,10 @@ async function resetPasswordEmail(phone) {
         },
     });
     const resetLink = `https://firstchoice-ten.vercel.app/reset-password?token=${token}&email=${encodeURIComponent(user.email)}`;
-    console.log(`Email: ${user.email}, Name: ${user.name}, ResetLink: ${resetLink}`);
     await (0, email_service_1.sendPasswordResetEmail)(user.email, user.name, resetLink);
     return {
         message: "Password reset link sent",
+        email: user.email,
     };
 }
 // Reuse whatever firebase-admin app instance you already initialized for FCM.

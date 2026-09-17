@@ -43,6 +43,7 @@ exports.changePassword = changePassword;
 exports.getMyOrders = getMyOrders;
 exports.getMyDeliveries = getMyDeliveries;
 exports.getMyErrands = getMyErrands;
+exports.deleteAccountHandler = deleteAccountHandler;
 const UserService = __importStar(require("../services/user.service"));
 const cloudinary_1 = __importDefault(require("../config/cloudinary"));
 async function getMe(req, res) {
@@ -56,10 +57,11 @@ async function getMe(req, res) {
 }
 async function updateProfile(req, res) {
     try {
-        const { name, email, profileImage } = req.body;
+        const { name, email, phone, profileImage } = req.body;
         const user = await UserService.updateProfile(req.user.id, {
             name,
             email,
+            phone,
             profileImage,
         });
         res.status(200).json({ success: true, data: user });
@@ -80,7 +82,7 @@ async function uploadAvatar(req, res) {
             stream.end(file.buffer);
         });
         const user = await UserService.updateProfile(req.user.id, { profileImage: uploadResult.secure_url });
-        res.status(200).json({ success: true, message: 'Avatar updated', data: {} });
+        res.status(200).json({ success: true, message: 'Avatar updated', data: user }); // ← return it
     }
     catch (err) {
         res.status(400).json({ success: false, message: err.message || 'Avatar upload failed' });
@@ -120,6 +122,18 @@ async function getMyErrands(req, res) {
     }
     catch (err) {
         res.status(400).json({ success: false, message: err.message });
+    }
+}
+async function deleteAccountHandler(req, res) {
+    try {
+        const { password } = req.body;
+        if (!password)
+            return res.status(400).json({ message: 'Password is required to delete your account' });
+        const result = await UserService.deleteAccount(req.user.id, password);
+        res.json(result);
+    }
+    catch (err) {
+        res.status(400).json({ message: err.message });
     }
 }
 //# sourceMappingURL=user.controller.js.map

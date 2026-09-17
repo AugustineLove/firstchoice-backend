@@ -1,10 +1,11 @@
 import * as NotificationService from './notification.service';
-import { OrderStatus, UserStatus, VendorStatus } from '@prisma/client';
+import { DeliveryStatus, OrderStatus, UserStatus, VendorStatus } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { notifyRiders, notifyUser } from '../socket/socket.manager';
+import { notifyAdmins, notifyRiders, notifyUser } from '../socket/socket.manager';
 import { validateOpeningHours } from './vendor.service';
+import { emitOrderEvent } from './order.service';
 // ─── OVERVIEW STATS ─────────────────────────────────────
 
 export async function getOverviewStats() {
@@ -537,6 +538,296 @@ export async function assignRiderToOrder(orderId: string, riderId: string) {
 
   // Tell the rider pool this order is spoken for (in case it was ever broadcast)
   notifyRiders('delivery:taken', { orderId });
+
+  return updated;
+}
+
+export async function assignRiderToDelivery(deliveryId: string, riderId: string) {
+  const delivery = await prisma.deliveryRequest.findUnique({
+    where: { id: deliveryId },
+    include: {
+      rider: { select: { id: true, userId: true, user: { select: { name: true, phone: true } } } },
+      customer: { select: { id: true, name: true, phone: true } },
+    },
+  });
+  if (!delivery) throw new Error('Delivery request not found');
+
+  // Any delivery still "in flight" can have a rider (re)assigned.
+  // Once it's DELIVERED or CANCELLED, it's locked.
+  const assignableStatuses: DeliveryStatus[] = ['PENDING', 'ACCEPTED', 'PICKED_UP', 'IN_TRANSIT'];
+  if (!assignableStatuses.includes(delivery.status))
+    throw new Error(`Cannot assign a rider to a delivery request that is ${delivery.status}`);
+
+  const previousRiderId = delivery.assignedRiderId;
+  const previousRiderUserId = delivery.rider?.userId;
+  const isReassignment = !!previousRiderId;
+
+  if (isReassignment && previousRiderId === riderId)
+    throw new Error('Delivery request is already assigned to this rider');
+
+  const rider = await prisma.rider.findUnique({
+    where: { id: riderId },
+    include: { user: { select: { name: true, phone: true } } },
+  });
+  if (!rider) throw new Error('Rider not found');
+  if (rider.availability !== 'ONLINE')
+    throw new Error('Rider is not available');
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.deliveryRequest.update({
+      where: { id: deliveryId },
+      data: {
+        assignedRiderId: riderId,
+        // Only bump status on the FIRST assignment (from PENDING to ACCEPTED).
+        // Reassigning mid-delivery (e.g. rider went offline after pickup) leaves status alone.
+        ...(isReassignment ? {} : { status: 'ACCEPTED' }),
+      },
+      include: {
+        customer: { select: { id: true, name: true, phone: true } },
+        rider: {
+          include: { user: { select: { name: true, phone: true } } },
+        },
+      },
+    });
+
+    // Free the previous rider back up
+    if (isReassignment && previousRiderId) {
+      await tx.rider.update({
+        where: { id: previousRiderId },
+        data: { availability: 'ONLINE' },
+      });
+    }
+
+    // Lock in the new one
+    await tx.rider.update({
+      where: { id: riderId },
+      data: { availability: 'BUSY' },
+    });
+
+    return result;
+  });
+
+  // ── Notifications ──
+  notifyUser(updated.customerId, 'delivery:rider_assigned', {
+    deliveryId,
+    riderName: updated.rider?.user?.name,
+    riderPhone: updated.rider?.user?.phone,
+    reassigned: isReassignment,
+    timestamp: new Date(),
+  });
+
+  if (isReassignment && previousRiderUserId) {
+    notifyUser(previousRiderUserId, 'delivery:unassigned', {
+      deliveryId,
+      reason: 'Reassigned by admin',
+      timestamp: new Date(),
+    });
+  }
+
+  // Notify newly assigned rider
+  if (rider.userId) {
+    notifyUser(rider.userId, 'delivery:rider_assigned', {
+      deliveryId,
+      timestamp: new Date(),
+    });
+  }
+
+  // Push notification for delivery status change
+  await NotificationService.notifyDeliveryStatusChange(deliveryId, updated.status);
+
+  // Tell the rider pool this delivery is spoken for (in case it was ever broadcast)
+  notifyRiders('delivery:taken', { deliveryId });
+
+  // Notify admins
+  notifyAdmins('admin:delivery_assigned', {
+    deliveryId,
+    riderId,
+    riderName: updated.rider?.user?.name,
+    reassigned: isReassignment,
+  });
+
+  return updated;
+}
+
+export async function updateOrderStatusAdmin(
+  orderId: string,
+  newStatus: OrderStatus,
+  options?: { riderId?: string }
+) {
+  if (!orderId) throw new Error('Order ID is required');
+
+  const validStatuses: OrderStatus[] = [
+    'PENDING',
+    'ACCEPTED',
+    'RIDER_ASSIGNED',
+    'PICKED_UP',
+    'IN_TRANSIT',
+    'ARRIVED',
+    'DELIVERED',
+    'CANCELLED',
+  ];
+
+  if (!validStatuses.includes(newStatus)) {
+    throw new Error(`Invalid order status. Must be one of: ${validStatuses.join(', ')}`);
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: {
+      vendor: true,
+      customer: { select: { id: true, name: true, phone: true } },
+      rider: { include: { user: { select: { id: true, name: true, phone: true } } } },
+      items: { include: { product: true } },
+    },
+  });
+  if (!order) throw new Error('Order not found');
+
+  // Handle rider assignment
+  let targetRiderId = options?.riderId !== undefined ? (options.riderId || null) : order.riderId;
+
+  if (options?.riderId) {
+    const riderExists = await prisma.rider.findUnique({
+      where: { id: options.riderId },
+      include: { user: { select: { id: true, name: true, phone: true } } },
+    });
+    if (!riderExists) throw new Error('Rider not found');
+  }
+
+  // If status is PENDING, clear rider
+  if (newStatus === 'PENDING') {
+    targetRiderId = null;
+  }
+
+  // If status is RIDER_ASSIGNED, ensure a rider is assigned
+  if (newStatus === 'RIDER_ASSIGNED' && !targetRiderId) {
+    throw new Error('Rider ID is required to set status to RIDER_ASSIGNED');
+  }
+
+  // If transit/delivery in progress, require an assigned rider
+  if (['PICKED_UP', 'IN_TRANSIT', 'ARRIVED'].includes(newStatus) && !targetRiderId) {
+    throw new Error(`A rider must be assigned before setting order status to ${newStatus}`);
+  }
+
+  const previousRiderId = order.riderId;
+  const previousRiderUserId = order.rider?.user?.id;
+  const isRiderChanging = targetRiderId !== previousRiderId;
+
+  // Execute database updates inside transaction
+  const updated = await prisma.$transaction(async (tx) => {
+    // 1. Stock adjustments
+    if (newStatus === 'CANCELLED' && order.orderStatus !== 'CANCELLED') {
+      for (const item of order.items) {
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { increment: item.quantity } },
+        });
+      }
+    } else if (order.orderStatus === 'CANCELLED' && newStatus !== 'CANCELLED') {
+      for (const item of order.items) {
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { decrement: item.quantity } },
+        });
+      }
+    }
+
+    // 2. Rider availability & earnings
+    // Free previous rider if rider changed, or if resetting to PENDING/CANCELLED
+    if (previousRiderId && (isRiderChanging || newStatus === 'PENDING' || newStatus === 'CANCELLED')) {
+      await tx.rider.update({
+        where: { id: previousRiderId },
+        data: { availability: 'ONLINE' },
+      });
+    }
+
+    // Adjust for prior DELIVERED status if reverting
+    if (order.orderStatus === 'DELIVERED' && newStatus !== 'DELIVERED' && order.riderId) {
+      await tx.rider.update({
+        where: { id: order.riderId },
+        data: {
+          totalDeliveries: { decrement: 1 },
+          earnings: { decrement: order.deliveryFee ?? 0 },
+        },
+      });
+    }
+
+    // Updates on target rider
+    if (targetRiderId) {
+      if (newStatus === 'DELIVERED' && order.orderStatus !== 'DELIVERED') {
+        await tx.rider.update({
+          where: { id: targetRiderId },
+          data: {
+            totalDeliveries: { increment: 1 },
+            earnings: { increment: order.deliveryFee ?? 0 },
+            availability: 'ONLINE',
+          },
+        });
+      } else if (newStatus === 'CANCELLED') {
+        await tx.rider.update({
+          where: { id: targetRiderId },
+          data: { availability: 'ONLINE' },
+        });
+      } else if (['RIDER_ASSIGNED', 'PICKED_UP', 'IN_TRANSIT', 'ARRIVED'].includes(newStatus)) {
+        await tx.rider.update({
+          where: { id: targetRiderId },
+          data: { availability: 'BUSY' },
+        });
+      }
+    }
+
+    // 3. Update the Order
+    return tx.order.update({
+      where: { id: orderId },
+      data: {
+        orderStatus: newStatus,
+        riderId: targetRiderId,
+      },
+      include: {
+        customer: { select: { id: true, name: true, phone: true } },
+        vendor: { select: { businessName: true, address: true } },
+        rider: { include: { user: { select: { id: true, name: true, phone: true } } } },
+        items: { include: { product: { select: { name: true } } } },
+      },
+    });
+  });
+
+  // 4. Socket notifications and push notifications
+  await emitOrderEvent(orderId, newStatus);
+  await NotificationService.notifyOrderStatusChange(orderId, newStatus);
+
+  // If status reset to PENDING, broadcast to rider pool
+  if (newStatus === 'PENDING') {
+    notifyRiders('delivery:new_request', {
+      type: 'NEW_DELIVERY',
+      orderId: order.id,
+      pickupAddress: order.vendor?.address,
+      destinationAddress: order.deliveryAddress,
+      itemDescription: order.notes,
+      estimatedFee: order.deliveryFee,
+      paymentMethod: order.paymentMethod,
+      customer: { name: order.recipientName, phone: order.recipientPhone },
+      createdAt: order.createdAt,
+    });
+  }
+
+  // Rider transition notifications
+  if (isRiderChanging) {
+    if (previousRiderUserId) {
+      notifyUser(previousRiderUserId, 'delivery:unassigned', {
+        orderId,
+        reason: 'Order reassigned or updated by admin',
+        timestamp: new Date(),
+      });
+    }
+
+    if (targetRiderId && updated.rider?.user?.id) {
+      notifyUser(updated.rider.user.id, 'delivery:rider_assigned', {
+        orderId,
+        timestamp: new Date(),
+      });
+      notifyRiders('delivery:taken', { orderId });
+    }
+  }
 
   return updated;
 }

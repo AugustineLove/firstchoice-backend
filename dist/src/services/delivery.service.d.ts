@@ -9,6 +9,7 @@ export declare function getDeliveryById(deliveryId: string, userId: string): Pro
     } & {
         id: string;
         createdAt: Date;
+        rating: number;
         userId: string;
         bikeType: string;
         licenseNumber: string | null;
@@ -16,7 +17,6 @@ export declare function getDeliveryById(deliveryId: string, userId: string): Pro
         currentLatitude: number | null;
         currentLongitude: number | null;
         totalDeliveries: number;
-        rating: number;
         earnings: number;
     }) | null;
     customer: {
@@ -29,6 +29,7 @@ export declare function getDeliveryById(deliveryId: string, userId: string): Pro
     createdAt: Date;
     updatedAt: Date;
     customerId: string;
+    deliveryFee: number;
     paymentMethod: import("@prisma/client").$Enums.PaymentMethod;
     recipientName: string | null;
     recipientPhone: string | null;
@@ -36,11 +37,15 @@ export declare function getDeliveryById(deliveryId: string, userId: string): Pro
     pickupLatitude: number | null;
     pickupLongitude: number | null;
     assignedRiderId: string | null;
+    type: import("@prisma/client").$Enums.DeliveryKind;
     pickupAddress: string;
     destinationAddress: string;
     destinationLatitude: number | null;
     destinationLongitude: number | null;
     itemDescription: string;
+    errandItems: import("@prisma/client/runtime/library").JsonValue | null;
+    itemsEstimatedTotal: number;
+    errandFee: number;
     estimatedFee: number;
 }>;
 export declare function assignRiderToDelivery(deliveryId: string, riderId: string): Promise<{
@@ -52,6 +57,7 @@ export declare function assignRiderToDelivery(deliveryId: string, riderId: strin
     } & {
         id: string;
         createdAt: Date;
+        rating: number;
         userId: string;
         bikeType: string;
         licenseNumber: string | null;
@@ -59,11 +65,11 @@ export declare function assignRiderToDelivery(deliveryId: string, riderId: strin
         currentLatitude: number | null;
         currentLongitude: number | null;
         totalDeliveries: number;
-        rating: number;
         earnings: number;
     }) | null;
     customer: {
         name: string;
+        id: string;
         phone: string;
     };
 } & {
@@ -72,6 +78,7 @@ export declare function assignRiderToDelivery(deliveryId: string, riderId: strin
     createdAt: Date;
     updatedAt: Date;
     customerId: string;
+    deliveryFee: number;
     paymentMethod: import("@prisma/client").$Enums.PaymentMethod;
     recipientName: string | null;
     recipientPhone: string | null;
@@ -79,11 +86,15 @@ export declare function assignRiderToDelivery(deliveryId: string, riderId: strin
     pickupLatitude: number | null;
     pickupLongitude: number | null;
     assignedRiderId: string | null;
+    type: import("@prisma/client").$Enums.DeliveryKind;
     pickupAddress: string;
     destinationAddress: string;
     destinationLatitude: number | null;
     destinationLongitude: number | null;
     itemDescription: string;
+    errandItems: import("@prisma/client/runtime/library").JsonValue | null;
+    itemsEstimatedTotal: number;
+    errandFee: number;
     estimatedFee: number;
 }>;
 export declare function getAllDeliveries(filters: {
@@ -100,6 +111,7 @@ export declare function getAllDeliveries(filters: {
         } & {
             id: string;
             createdAt: Date;
+            rating: number;
             userId: string;
             bikeType: string;
             licenseNumber: string | null;
@@ -107,7 +119,6 @@ export declare function getAllDeliveries(filters: {
             currentLatitude: number | null;
             currentLongitude: number | null;
             totalDeliveries: number;
-            rating: number;
             earnings: number;
         }) | null;
         customer: {
@@ -120,6 +131,7 @@ export declare function getAllDeliveries(filters: {
         createdAt: Date;
         updatedAt: Date;
         customerId: string;
+        deliveryFee: number;
         paymentMethod: import("@prisma/client").$Enums.PaymentMethod;
         recipientName: string | null;
         recipientPhone: string | null;
@@ -127,11 +139,15 @@ export declare function getAllDeliveries(filters: {
         pickupLatitude: number | null;
         pickupLongitude: number | null;
         assignedRiderId: string | null;
+        type: import("@prisma/client").$Enums.DeliveryKind;
         pickupAddress: string;
         destinationAddress: string;
         destinationLatitude: number | null;
         destinationLongitude: number | null;
         itemDescription: string;
+        errandItems: import("@prisma/client/runtime/library").JsonValue | null;
+        itemsEstimatedTotal: number;
+        errandFee: number;
         estimatedFee: number;
     })[];
     pagination: {
@@ -203,13 +219,18 @@ export declare function deleteLocation(id: string): Promise<{
     isActive: boolean;
 }>;
 export declare function createDeliveryRequest(customerId: string, data: {
-    pickupAddress: string;
+    type?: 'PICKUP' | 'ERRAND';
+    pickupAddress?: string;
     pickupLatitude?: number;
     pickupLongitude?: number;
     destinationAddress: string;
     destinationLatitude?: number;
     destinationLongitude?: number;
-    itemDescription: string;
+    itemDescription?: string;
+    errandItems?: {
+        text: string;
+        estimatedPrice: number;
+    }[];
     paymentMethod: 'CASH' | 'MOMO';
     recipientName?: string;
     recipientPhone?: string;
@@ -225,6 +246,7 @@ export declare function createDeliveryRequest(customerId: string, data: {
     createdAt: Date;
     updatedAt: Date;
     customerId: string;
+    deliveryFee: number;
     paymentMethod: import("@prisma/client").$Enums.PaymentMethod;
     recipientName: string | null;
     recipientPhone: string | null;
@@ -232,11 +254,15 @@ export declare function createDeliveryRequest(customerId: string, data: {
     pickupLatitude: number | null;
     pickupLongitude: number | null;
     assignedRiderId: string | null;
+    type: import("@prisma/client").$Enums.DeliveryKind;
     pickupAddress: string;
     destinationAddress: string;
     destinationLatitude: number | null;
     destinationLongitude: number | null;
     itemDescription: string;
+    errandItems: import("@prisma/client/runtime/library").JsonValue | null;
+    itemsEstimatedTotal: number;
+    errandFee: number;
     estimatedFee: number;
 }>;
 export declare function riderAcceptDelivery(deliveryId: string, riderUserId: string): Promise<{
@@ -248,6 +274,7 @@ export declare function riderAcceptDelivery(deliveryId: string, riderUserId: str
     } & {
         id: string;
         createdAt: Date;
+        rating: number;
         userId: string;
         bikeType: string;
         licenseNumber: string | null;
@@ -255,7 +282,6 @@ export declare function riderAcceptDelivery(deliveryId: string, riderUserId: str
         currentLatitude: number | null;
         currentLongitude: number | null;
         totalDeliveries: number;
-        rating: number;
         earnings: number;
     }) | null;
     customer: {
@@ -269,6 +295,7 @@ export declare function riderAcceptDelivery(deliveryId: string, riderUserId: str
     createdAt: Date;
     updatedAt: Date;
     customerId: string;
+    deliveryFee: number;
     paymentMethod: import("@prisma/client").$Enums.PaymentMethod;
     recipientName: string | null;
     recipientPhone: string | null;
@@ -276,11 +303,15 @@ export declare function riderAcceptDelivery(deliveryId: string, riderUserId: str
     pickupLatitude: number | null;
     pickupLongitude: number | null;
     assignedRiderId: string | null;
+    type: import("@prisma/client").$Enums.DeliveryKind;
     pickupAddress: string;
     destinationAddress: string;
     destinationLatitude: number | null;
     destinationLongitude: number | null;
     itemDescription: string;
+    errandItems: import("@prisma/client/runtime/library").JsonValue | null;
+    itemsEstimatedTotal: number;
+    errandFee: number;
     estimatedFee: number;
 }>;
 export declare function updateDeliveryStatus(deliveryId: string, userId: string, newStatus: DeliveryStatus): Promise<{
@@ -292,6 +323,7 @@ export declare function updateDeliveryStatus(deliveryId: string, userId: string,
     } & {
         id: string;
         createdAt: Date;
+        rating: number;
         userId: string;
         bikeType: string;
         licenseNumber: string | null;
@@ -299,7 +331,6 @@ export declare function updateDeliveryStatus(deliveryId: string, userId: string,
         currentLatitude: number | null;
         currentLongitude: number | null;
         totalDeliveries: number;
-        rating: number;
         earnings: number;
     }) | null;
     customer: {
@@ -313,6 +344,7 @@ export declare function updateDeliveryStatus(deliveryId: string, userId: string,
     createdAt: Date;
     updatedAt: Date;
     customerId: string;
+    deliveryFee: number;
     paymentMethod: import("@prisma/client").$Enums.PaymentMethod;
     recipientName: string | null;
     recipientPhone: string | null;
@@ -320,11 +352,15 @@ export declare function updateDeliveryStatus(deliveryId: string, userId: string,
     pickupLatitude: number | null;
     pickupLongitude: number | null;
     assignedRiderId: string | null;
+    type: import("@prisma/client").$Enums.DeliveryKind;
     pickupAddress: string;
     destinationAddress: string;
     destinationLatitude: number | null;
     destinationLongitude: number | null;
     itemDescription: string;
+    errandItems: import("@prisma/client/runtime/library").JsonValue | null;
+    itemsEstimatedTotal: number;
+    errandFee: number;
     estimatedFee: number;
 }>;
 export declare function getPendingDeliveries(): Promise<({
@@ -338,6 +374,7 @@ export declare function getPendingDeliveries(): Promise<({
     createdAt: Date;
     updatedAt: Date;
     customerId: string;
+    deliveryFee: number;
     paymentMethod: import("@prisma/client").$Enums.PaymentMethod;
     recipientName: string | null;
     recipientPhone: string | null;
@@ -345,11 +382,15 @@ export declare function getPendingDeliveries(): Promise<({
     pickupLatitude: number | null;
     pickupLongitude: number | null;
     assignedRiderId: string | null;
+    type: import("@prisma/client").$Enums.DeliveryKind;
     pickupAddress: string;
     destinationAddress: string;
     destinationLatitude: number | null;
     destinationLongitude: number | null;
     itemDescription: string;
+    errandItems: import("@prisma/client/runtime/library").JsonValue | null;
+    itemsEstimatedTotal: number;
+    errandFee: number;
     estimatedFee: number;
 })[]>;
 export declare function getRiderJobs(riderUserId: string): Promise<{
@@ -364,6 +405,7 @@ export declare function getRiderJobs(riderUserId: string): Promise<{
         createdAt: Date;
         updatedAt: Date;
         customerId: string;
+        deliveryFee: number;
         paymentMethod: import("@prisma/client").$Enums.PaymentMethod;
         recipientName: string | null;
         recipientPhone: string | null;
@@ -371,11 +413,15 @@ export declare function getRiderJobs(riderUserId: string): Promise<{
         pickupLatitude: number | null;
         pickupLongitude: number | null;
         assignedRiderId: string | null;
+        type: import("@prisma/client").$Enums.DeliveryKind;
         pickupAddress: string;
         destinationAddress: string;
         destinationLatitude: number | null;
         destinationLongitude: number | null;
         itemDescription: string;
+        errandItems: import("@prisma/client/runtime/library").JsonValue | null;
+        itemsEstimatedTotal: number;
+        errandFee: number;
         estimatedFee: number;
     })[];
     history: ({
@@ -389,6 +435,7 @@ export declare function getRiderJobs(riderUserId: string): Promise<{
         createdAt: Date;
         updatedAt: Date;
         customerId: string;
+        deliveryFee: number;
         paymentMethod: import("@prisma/client").$Enums.PaymentMethod;
         recipientName: string | null;
         recipientPhone: string | null;
@@ -396,11 +443,15 @@ export declare function getRiderJobs(riderUserId: string): Promise<{
         pickupLatitude: number | null;
         pickupLongitude: number | null;
         assignedRiderId: string | null;
+        type: import("@prisma/client").$Enums.DeliveryKind;
         pickupAddress: string;
         destinationAddress: string;
         destinationLatitude: number | null;
         destinationLongitude: number | null;
         itemDescription: string;
+        errandItems: import("@prisma/client/runtime/library").JsonValue | null;
+        itemsEstimatedTotal: number;
+        errandFee: number;
         estimatedFee: number;
     })[];
 }>;

@@ -25,6 +25,7 @@ allRoutes.use('/api/deliveries', deliveryRouter);
 allRoutes.use('/api/errands', errandRouter);
 allRoutes.use('/api/transactions', transactionRouter);
 allRoutes.use('/api/admin', adminRouter);
+allRoutes.use('/admin', adminRouter);
 allRoutes.use('/api/locations', locationRouter);
 allRoutes.use('/api/settings', settingsRouter); 
 allRoutes.get('/api/operating-status', getOperatingStatus);

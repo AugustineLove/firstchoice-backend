@@ -10,7 +10,40 @@ exports.searchProducts = searchProducts;
 exports.addAddonGroup = addAddonGroup;
 exports.deleteAddonGroup = deleteAddonGroup;
 exports.addVariantGroup = addVariantGroup;
+exports.calculateAddonPrice = calculateAddonPrice;
 const prisma_1 = require("../config/prisma");
+// ─── ADDON PRICING NORMALIZATION ─────────────────────────
+//
+// Pricing formulas (qty = quantity selected, base = addon.price):
+//   multiple -> base * qty
+//   free     -> base + (qty - 1) * 1
+//   halves   -> base + (qty - 1) * (base / 2)
+//   custom   -> base + (qty - 1) * customIncrementValue
+//
+// customIncrementValue only applies to 'custom' mode and is always
+// coerced to a positive number (defaulting to 1 if missing/invalid/<=0).
+const VALID_INCREMENT_MODES = ['multiple', 'free', 'halves', 'custom'];
+function normalizeAddon(a) {
+    const incrementable = Boolean(a.incrementable);
+    let incrementMode = null;
+    if (incrementable) {
+        const requested = (a.incrementMode ?? 'multiple');
+        incrementMode = VALID_INCREMENT_MODES.includes(requested) ? requested : 'multiple';
+    }
+    let customIncrementValue = null;
+    if (incrementable && incrementMode === 'custom') {
+        const raw = Number(a.customIncrementValue);
+        customIncrementValue = Number.isFinite(raw) && raw > 0 ? raw : 1;
+    }
+    return {
+        name: a.name,
+        price: a.price ?? 0,
+        available: a.available ?? true,
+        incrementable,
+        incrementMode,
+        customIncrementValue,
+    };
+}
 // ─── FULL PRODUCT INCLUDE ────────────────────────────────
 const fullProductInclude = {
     variantGroups: {
@@ -30,6 +63,7 @@ const fullProductInclude = {
             logo: true,
             address: true,
             rating: true,
+            phone: true,
         },
     },
 };
@@ -64,7 +98,7 @@ async function createProduct(userId, data) {
                         name: g.name,
                         minSelect: g.minSelect ?? 0,
                         maxSelect: g.maxSelect ?? 10,
-                        addons: { create: g.addons },
+                        addons: { create: g.addons.map(normalizeAddon) },
                     })),
                 },
             }),
@@ -77,6 +111,7 @@ async function createProduct(userId, data) {
 }
 // ─── UPDATE ──────────────────────────────────────────────
 async function updateProduct(userId, productId, data) {
+    console.log(`Updating product ${productId} for user ${userId} with data:`, data);
     const vendor = await prisma_1.prisma.vendor.findUnique({ where: { userId } });
     if (!vendor)
         throw new Error('Vendor profile not found');
@@ -135,7 +170,7 @@ async function updateProduct(userId, productId, data) {
                     const group = groups.find(gr => gr.name === g.name);
                     if (group && g.addons.length) {
                         await tx.productAddon.createMany({
-                            data: g.addons.map(a => ({ ...a, groupId: group.id })),
+                            data: g.addons.map(a => ({ ...normalizeAddon(a), groupId: group.id })),
                         });
                     }
                 }));
@@ -235,7 +270,7 @@ async function addAddonGroup(userId, productId, data) {
             name: data.name,
             minSelect: data.minSelect ?? 0,
             maxSelect: data.maxSelect ?? 10,
-            addons: { create: data.addons },
+            addons: { create: data.addons.map(normalizeAddon) },
         },
         include: { addons: true },
     });
@@ -269,5 +304,29 @@ async function addVariantGroup(userId, productId, data) {
         },
         include: { variants: true },
     });
+}
+// ─── ADDON PRICE CALCULATION (for order pricing) ─────────
+//
+// Use this wherever an order/cart computes the price of a selected
+// addon at a given quantity, so the formula lives in exactly one place.
+function calculateAddonPrice(addon, qty) {
+    const quantity = Math.max(1, Math.floor(qty));
+    const base = addon.price ?? 0;
+    if (!addon.incrementable || quantity <= 1)
+        return base;
+    switch (addon.incrementMode) {
+        case 'multiple':
+            return base * quantity;
+        case 'free':
+            return base + (quantity - 1) * 1;
+        case 'halves':
+            return base + (quantity - 1) * (base / 2);
+        case 'custom': {
+            const step = addon.customIncrementValue && addon.customIncrementValue > 0 ? addon.customIncrementValue : 1;
+            return base + (quantity - 1) * step;
+        }
+        default:
+            return base * quantity;
+    }
 }
 //# sourceMappingURL=product.service.js.map

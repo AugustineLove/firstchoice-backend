@@ -9,10 +9,10 @@ export declare function getUserById(id: string): Promise<{
     createdAt: Date;
     rider: {
         id: string;
+        rating: number;
         bikeType: string;
         availability: import("@prisma/client").$Enums.RiderAvailability;
         totalDeliveries: number;
-        rating: number;
         earnings: number;
     } | null;
     vendor: {
@@ -61,8 +61,8 @@ export declare function getUserOrders(id: string): Promise<({
         };
     } & {
         id: string;
-        orderId: string;
         productId: string;
+        orderId: string;
         quantity: number;
         unitPrice: number;
         selectedVariants: import("@prisma/client/runtime/library").JsonValue | null;
@@ -107,6 +107,7 @@ export declare function getUserDeliveries(id: string): Promise<({
     createdAt: Date;
     updatedAt: Date;
     customerId: string;
+    deliveryFee: number;
     paymentMethod: import("@prisma/client").$Enums.PaymentMethod;
     recipientName: string | null;
     recipientPhone: string | null;
@@ -114,11 +115,15 @@ export declare function getUserDeliveries(id: string): Promise<({
     pickupLatitude: number | null;
     pickupLongitude: number | null;
     assignedRiderId: string | null;
+    type: import("@prisma/client").$Enums.DeliveryKind;
     pickupAddress: string;
     destinationAddress: string;
     destinationLatitude: number | null;
     destinationLongitude: number | null;
     itemDescription: string;
+    errandItems: import("@prisma/client/runtime/library").JsonValue | null;
+    itemsEstimatedTotal: number;
+    errandFee: number;
     estimatedFee: number;
 })[]>;
 export declare function getUserErrands(id: string): Promise<{
@@ -132,3 +137,6 @@ export declare function getUserErrands(id: string): Promise<{
     budget: number;
     pickupLocation: string | null;
 }[]>;
+export declare function deleteAccount(id: string, password: string): Promise<{
+    message: string;
+}>;

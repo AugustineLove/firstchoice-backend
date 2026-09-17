@@ -1,4 +1,4 @@
-import { UserStatus, VendorStatus } from '@prisma/client';
+import { OrderStatus, UserStatus, VendorStatus } from '@prisma/client';
 export declare function getOverviewStats(): Promise<{
     users: {
         total: number;
@@ -27,6 +27,72 @@ export declare function getOverviewStats(): Promise<{
         today: number;
     };
 }>;
+export declare function getAdminOverview(): Promise<{
+    kpis: {
+        totalUsers: number;
+        usersByRole: {
+            [k: string]: number;
+        };
+        totalVendors: number;
+        activeVendors: number;
+        pendingVendors: number;
+        totalRiders: number;
+        onlineRiders: number;
+        ordersToday: number;
+        deliveriesToday: number;
+        revenueToday: number;
+        totalRevenueAllTime: number;
+        cancellationRate: number;
+    };
+    dailyTrend: {
+        totalRevenue: number;
+        totalCount: number;
+        date: string;
+        orderRevenue: number;
+        deliveryRevenue: number;
+        orderCount: number;
+        deliveryCount: number;
+    }[];
+    userGrowth: {
+        date: string;
+        customers: number;
+        vendors: number;
+        riders: number;
+    }[];
+    orderStatusBreakdown: {
+        status: import("@prisma/client").$Enums.OrderStatus;
+        count: number;
+    }[];
+    deliveryStatusBreakdown: {
+        status: import("@prisma/client").$Enums.DeliveryStatus;
+        count: number;
+    }[];
+    orderTypeBreakdown: {
+        type: string;
+        count: number;
+    }[];
+    paymentMethodBreakdown: {
+        method: string;
+        count: number;
+    }[];
+    topVendors: {
+        vendorId: string;
+        businessName: string;
+        logo: string | null;
+        orderCount: number;
+        revenue: number;
+    }[];
+    topRiders: {
+        id: string;
+        name: string;
+        phone: string;
+        rating: number;
+        availability: import("@prisma/client").$Enums.RiderAvailability;
+        totalEarnings: number;
+        totalJobs: number;
+        completedJobs: number;
+    }[];
+}>;
 export declare function getAllUsers(filters: {
     role?: string;
     status?: string;
@@ -44,9 +110,9 @@ export declare function getAllUsers(filters: {
         status: import("@prisma/client").$Enums.UserStatus;
         createdAt: Date;
         rider: {
+            rating: number;
             availability: import("@prisma/client").$Enums.RiderAvailability;
             totalDeliveries: number;
-            rating: number;
         } | null;
         vendor: {
             status: import("@prisma/client").$Enums.VendorStatus;
@@ -88,13 +154,13 @@ export declare function getAllVendorsAdmin(filters: {
         phone: string;
         status: import("@prisma/client").$Enums.VendorStatus;
         createdAt: Date;
-        userId: string;
         rating: number;
+        userId: string;
         businessName: string;
         businessType: string;
         address: string;
         logo: string | null;
-        openingHours: string | null;
+        openingHours: import("@prisma/client/runtime/library").JsonValue | null;
         longitude: string | null;
         latitude: string | null;
     })[];
@@ -110,13 +176,13 @@ export declare function updateVendorStatus(vendorId: string, status: VendorStatu
     phone: string;
     status: import("@prisma/client").$Enums.VendorStatus;
     createdAt: Date;
-    userId: string;
     rating: number;
+    userId: string;
     businessName: string;
     businessType: string;
     address: string;
     logo: string | null;
-    openingHours: string | null;
+    openingHours: import("@prisma/client/runtime/library").JsonValue | null;
     longitude: string | null;
     latitude: string | null;
 }>;
@@ -135,6 +201,7 @@ export declare function getAllRidersAdmin(filters: {
     } & {
         id: string;
         createdAt: Date;
+        rating: number;
         userId: string;
         bikeType: string;
         licenseNumber: string | null;
@@ -142,7 +209,6 @@ export declare function getAllRidersAdmin(filters: {
         currentLatitude: number | null;
         currentLongitude: number | null;
         totalDeliveries: number;
-        rating: number;
         earnings: number;
     })[];
     pagination: {
@@ -161,6 +227,7 @@ export declare function assignRiderToOrder(orderId: string, riderId: string): Pr
     } & {
         id: string;
         createdAt: Date;
+        rating: number;
         userId: string;
         bikeType: string;
         licenseNumber: string | null;
@@ -168,7 +235,6 @@ export declare function assignRiderToOrder(orderId: string, riderId: string): Pr
         currentLatitude: number | null;
         currentLongitude: number | null;
         totalDeliveries: number;
-        rating: number;
         earnings: number;
     }) | null;
     vendor: {
@@ -177,6 +243,7 @@ export declare function assignRiderToOrder(orderId: string, riderId: string): Pr
     };
     customer: {
         name: string;
+        id: string;
         phone: string;
     };
     items: ({
@@ -185,8 +252,127 @@ export declare function assignRiderToOrder(orderId: string, riderId: string): Pr
         };
     } & {
         id: string;
-        orderId: string;
         productId: string;
+        orderId: string;
+        quantity: number;
+        unitPrice: number;
+        selectedVariants: import("@prisma/client/runtime/library").JsonValue | null;
+        selectedAddons: import("@prisma/client/runtime/library").JsonValue | null;
+        itemNotes: string | null;
+    })[];
+} & {
+    id: string;
+    createdAt: Date;
+    updatedAt: Date;
+    customerId: string;
+    vendorId: string;
+    riderId: string | null;
+    subtotal: number;
+    deliveryFee: number;
+    totalAmount: number;
+    orderType: import("@prisma/client").$Enums.OrderType;
+    paymentMethod: import("@prisma/client").$Enums.PaymentMethod;
+    paymentStatus: import("@prisma/client").$Enums.PaymentStatus;
+    orderStatus: import("@prisma/client").$Enums.OrderStatus;
+    recipientName: string | null;
+    recipientPhone: string | null;
+    deliveryAddress: string;
+    imageUrl: string | null;
+    vendorAddress: string | null;
+    notes: string | null;
+    deliveryLatitude: number | null;
+    deliveryLongitude: number | null;
+    pickupLatitude: number | null;
+    pickupLongitude: number | null;
+}>;
+export declare function assignRiderToDelivery(deliveryId: string, riderId: string): Promise<{
+    rider: ({
+        user: {
+            name: string;
+            phone: string;
+        };
+    } & {
+        id: string;
+        createdAt: Date;
+        rating: number;
+        userId: string;
+        bikeType: string;
+        licenseNumber: string | null;
+        availability: import("@prisma/client").$Enums.RiderAvailability;
+        currentLatitude: number | null;
+        currentLongitude: number | null;
+        totalDeliveries: number;
+        earnings: number;
+    }) | null;
+    customer: {
+        name: string;
+        id: string;
+        phone: string;
+    };
+} & {
+    id: string;
+    status: import("@prisma/client").$Enums.DeliveryStatus;
+    createdAt: Date;
+    updatedAt: Date;
+    customerId: string;
+    deliveryFee: number;
+    paymentMethod: import("@prisma/client").$Enums.PaymentMethod;
+    recipientName: string | null;
+    recipientPhone: string | null;
+    imageUrl: string | null;
+    pickupLatitude: number | null;
+    pickupLongitude: number | null;
+    assignedRiderId: string | null;
+    type: import("@prisma/client").$Enums.DeliveryKind;
+    pickupAddress: string;
+    destinationAddress: string;
+    destinationLatitude: number | null;
+    destinationLongitude: number | null;
+    itemDescription: string;
+    errandItems: import("@prisma/client/runtime/library").JsonValue | null;
+    itemsEstimatedTotal: number;
+    errandFee: number;
+    estimatedFee: number;
+}>;
+export declare function updateOrderStatusAdmin(orderId: string, newStatus: OrderStatus, options?: {
+    riderId?: string;
+}): Promise<{
+    rider: ({
+        user: {
+            name: string;
+            id: string;
+            phone: string;
+        };
+    } & {
+        id: string;
+        createdAt: Date;
+        rating: number;
+        userId: string;
+        bikeType: string;
+        licenseNumber: string | null;
+        availability: import("@prisma/client").$Enums.RiderAvailability;
+        currentLatitude: number | null;
+        currentLongitude: number | null;
+        totalDeliveries: number;
+        earnings: number;
+    }) | null;
+    vendor: {
+        businessName: string;
+        address: string;
+    };
+    customer: {
+        name: string;
+        id: string;
+        phone: string;
+    };
+    items: ({
+        product: {
+            name: string;
+        };
+    } & {
+        id: string;
+        productId: string;
+        orderId: string;
         quantity: number;
         unitPrice: number;
         selectedVariants: import("@prisma/client/runtime/library").JsonValue | null;
@@ -252,6 +438,7 @@ export declare function getRiderAnalytics(): Promise<{
     } & {
         id: string;
         createdAt: Date;
+        rating: number;
         userId: string;
         bikeType: string;
         licenseNumber: string | null;
@@ -259,7 +446,6 @@ export declare function getRiderAnalytics(): Promise<{
         currentLatitude: number | null;
         currentLongitude: number | null;
         totalDeliveries: number;
-        rating: number;
         earnings: number;
     })[];
     availabilitySummary: (import("@prisma/client").Prisma.PickEnumerable<import("@prisma/client").Prisma.RiderGroupByOutputType, "availability"[]> & {
@@ -273,7 +459,7 @@ export declare function createVendorWithOwner(data: {
     businessType: string;
     address: string;
     phone: string;
-    openingHours?: string;
+    openingHours?: unknown;
     logo?: string;
     ownerName: string;
     ownerPhone: string;
@@ -292,13 +478,13 @@ export declare function createVendorWithOwner(data: {
         phone: string;
         status: import("@prisma/client").$Enums.VendorStatus;
         createdAt: Date;
-        userId: string;
         rating: number;
+        userId: string;
         businessName: string;
         businessType: string;
         address: string;
         logo: string | null;
-        openingHours: string | null;
+        openingHours: import("@prisma/client/runtime/library").JsonValue | null;
         longitude: string | null;
         latitude: string | null;
     };
@@ -309,7 +495,7 @@ export declare function updateVendorProfile(vendorId: string, data: {
     businessType?: string;
     address?: string;
     phone?: string;
-    openingHours?: string;
+    openingHours?: unknown;
     logo?: string;
 }): Promise<{
     user: {
@@ -322,13 +508,13 @@ export declare function updateVendorProfile(vendorId: string, data: {
     phone: string;
     status: import("@prisma/client").$Enums.VendorStatus;
     createdAt: Date;
-    userId: string;
     rating: number;
+    userId: string;
     businessName: string;
     businessType: string;
     address: string;
     logo: string | null;
-    openingHours: string | null;
+    openingHours: import("@prisma/client/runtime/library").JsonValue | null;
     longitude: string | null;
     latitude: string | null;
 }>;
@@ -346,9 +532,9 @@ export declare function createProductForVendor(vendorId: string, data: {
     updatedAt: Date;
     vendorId: string;
     description: string | null;
+    images: string[];
     price: number;
     stock: number;
-    images: string[];
     category: string;
     available: boolean;
     preparationTime: number | null;
@@ -367,4 +553,47 @@ export declare function createProductForVendor(vendorId: string, data: {
 }>;
 export declare function deleteProductAdmin(productId: string): Promise<{
     message: string;
+}>;
+export declare function getRiderDailyReport(filters: {
+    startDate?: string;
+    endDate?: string;
+    riderId?: string;
+}): Promise<{
+    rows: {
+        riderName: string;
+        riderPhone: string;
+        riderId: string;
+        date: string;
+        jobs: number;
+        itemsSubtotal: number;
+        deliveryFees: number;
+        cashCollected: number;
+        momoCollected: number;
+        grandTotal: number;
+        netToRemit: number;
+    }[];
+    dailyTotals: Omit<{
+        riderId: string;
+        date: string;
+        jobs: number;
+        itemsSubtotal: number;
+        deliveryFees: number;
+        cashCollected: number;
+        momoCollected: number;
+        grandTotal: number;
+        netToRemit: number;
+    }, "riderId">[];
+    overall: {
+        jobs: number;
+        itemsSubtotal: number;
+        deliveryFees: number;
+        cashCollected: number;
+        momoCollected: number;
+        grandTotal: number;
+        netToRemit: number;
+    };
+    range: {
+        start: string;
+        end: string;
+    };
 }>;

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 export declare function getOverviewStats(req: Request, res: Response): Promise<void>;
+export declare function overview(req: Request, res: Response): Promise<void>;
 export declare function getAllUsers(req: Request, res: Response): Promise<void>;
 export declare function updateUserStatus(req: Request, res: Response): Promise<void>;
 export declare function getAllVendors(req: Request, res: Response): Promise<void>;
@@ -16,5 +17,11 @@ export declare function deleteVendorProduct(req: Request<{
 export declare function getAllRiders(req: Request, res: Response): Promise<void>;
 export declare function createVendor(req: Request, res: Response): Promise<void>;
 export declare function assignRiderToOrder(req: Request, res: Response): Promise<void>;
+export declare function assignRiderToDelivery(req: Request, res: Response): Promise<void>;
+export declare function updateOrderStatus(req: Request, res: Response): Promise<void>;
 export declare function getOrderAnalytics(req: Request, res: Response): Promise<void>;
 export declare function getRiderAnalytics(req: Request, res: Response): Promise<void>;
+export declare function broadcastNotification(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
+export declare function riderInsights(req: Request, res: Response): Promise<void>;
+export declare function riderJobHistory(req: Request, res: Response): Promise<void>;
+export declare function riderDailyReport(req: Request, res: Response): Promise<void>;

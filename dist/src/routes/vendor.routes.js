@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const VendorController = __importStar(require("../controllers/vendor.controller"));
 const auth_middleware_1 = require("../middleware/auth.middleware");
+const rating_controller_1 = require("../controllers/rating.controller");
 const vendorRouter = (0, express_1.Router)();
 // Public
 vendorRouter.get('/', VendorController.getAllVendors);
@@ -46,5 +47,11 @@ vendorRouter.get('/me/profile', auth_middleware_1.authenticate, VendorController
 vendorRouter.patch('/me/profile', auth_middleware_1.authenticate, VendorController.updateVendorProfile);
 vendorRouter.get('/me/orders', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)('VENDOR'), VendorController.getVendorOrders);
 vendorRouter.get('/me/stats', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)('VENDOR'), VendorController.getVendorStats);
+vendorRouter.post('/:id/rating', auth_middleware_1.authenticate, rating_controller_1.submitRating);
+// Average + count + the logged-in customer's own vote (if any).
+// This is what the vendor page calls on load.
+vendorRouter.get('/:id/rating/summary', auth_middleware_1.authenticate, rating_controller_1.getRatingSummary);
+// Public paginated review list — no auth required.
+vendorRouter.get('/:id/ratings', rating_controller_1.getRatings);
 exports.default = vendorRouter;
 //# sourceMappingURL=vendor.routes.js.map

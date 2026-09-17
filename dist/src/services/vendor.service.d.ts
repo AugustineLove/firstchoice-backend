@@ -4,23 +4,24 @@ export declare function registerVendor(userId: string, data: {
     address: string;
     phone: string;
     logo?: string;
-    openingHours?: string;
+    openingHours?: unknown;
 }): Promise<{
     id: string;
     phone: string;
     status: import("@prisma/client").$Enums.VendorStatus;
     createdAt: Date;
-    userId: string;
     rating: number;
+    userId: string;
     businessName: string;
     businessType: string;
     address: string;
     logo: string | null;
-    openingHours: string | null;
+    openingHours: import("@prisma/client/runtime/library").JsonValue | null;
     longitude: string | null;
     latitude: string | null;
 }>;
 export declare function getVendorProfile(vendorId: string): Promise<{
+    isOpen: boolean;
     user: {
         name: string;
         phone: string;
@@ -33,9 +34,9 @@ export declare function getVendorProfile(vendorId: string): Promise<{
         updatedAt: Date;
         vendorId: string;
         description: string | null;
+        images: string[];
         price: number;
         stock: number;
-        images: string[];
         category: string;
         available: boolean;
         preparationTime: number | null;
@@ -52,18 +53,17 @@ export declare function getVendorProfile(vendorId: string): Promise<{
         isPopular: boolean;
         isFeatured: boolean;
     }[];
-} & {
     id: string;
     phone: string;
     status: import("@prisma/client").$Enums.VendorStatus;
     createdAt: Date;
-    userId: string;
     rating: number;
+    userId: string;
     businessName: string;
     businessType: string;
     address: string;
     logo: string | null;
-    openingHours: string | null;
+    openingHours: import("@prisma/client/runtime/library").JsonValue | null;
     longitude: string | null;
     latitude: string | null;
 }>;
@@ -75,9 +75,9 @@ export declare function getMyVendorProfile(userId: string): Promise<{
         updatedAt: Date;
         vendorId: string;
         description: string | null;
+        images: string[];
         price: number;
         stock: number;
-        images: string[];
         category: string;
         available: boolean;
         preparationTime: number | null;
@@ -99,13 +99,13 @@ export declare function getMyVendorProfile(userId: string): Promise<{
     phone: string;
     status: import("@prisma/client").$Enums.VendorStatus;
     createdAt: Date;
-    userId: string;
     rating: number;
+    userId: string;
     businessName: string;
     businessType: string;
     address: string;
     logo: string | null;
-    openingHours: string | null;
+    openingHours: import("@prisma/client/runtime/library").JsonValue | null;
     longitude: string | null;
     latitude: string | null;
 }>;
@@ -115,19 +115,21 @@ export declare function updateVendorProfile(userId: string, data: {
     address?: string;
     phone?: string;
     logo?: string;
-    openingHours?: string;
+    openingHours?: unknown;
+    latitude?: string;
+    longitude?: string;
 }): Promise<{
     id: string;
     phone: string;
     status: import("@prisma/client").$Enums.VendorStatus;
     createdAt: Date;
-    userId: string;
     rating: number;
+    userId: string;
     businessName: string;
     businessType: string;
     address: string;
     logo: string | null;
-    openingHours: string | null;
+    openingHours: import("@prisma/client/runtime/library").JsonValue | null;
     longitude: string | null;
     latitude: string | null;
 }>;
@@ -135,6 +137,7 @@ export declare function getAllVendors(filters: {
     businessType?: string;
     search?: string;
 }): Promise<{
+    isOpen: boolean;
     id: string;
     status: import("@prisma/client").$Enums.VendorStatus;
     rating: number;
@@ -142,7 +145,7 @@ export declare function getAllVendors(filters: {
     businessType: string;
     address: string;
     logo: string | null;
-    openingHours: string | null;
+    openingHours: import("@prisma/client/runtime/library").JsonValue;
 }[]>;
 export declare function getVendorOrders(userId: string): Promise<({
     rider: {
@@ -162,8 +165,8 @@ export declare function getVendorOrders(userId: string): Promise<({
         };
     } & {
         id: string;
-        orderId: string;
         productId: string;
+        orderId: string;
         quantity: number;
         unitPrice: number;
         selectedVariants: import("@prisma/client/runtime/library").JsonValue | null;
@@ -202,3 +205,10 @@ export declare function getVendorStats(userId: string): Promise<{
     totalProducts: number;
     totalRevenue: number;
 }>;
+type DayHours = {
+    start: string;
+    end: string;
+}[];
+type WeeklyHours = Record<string, DayHours>;
+export declare function validateOpeningHours(hours: unknown): WeeklyHours;
+export {};

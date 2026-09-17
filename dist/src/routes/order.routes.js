@@ -41,16 +41,16 @@ const OrderController = __importStar(require("../controllers/order.controller"))
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const order_service_1 = require("../services/order.service");
 const multer_1 = __importDefault(require("multer"));
+const operating_hours_1 = require("../middleware/operating.hours");
 const orderRouter = (0, express_1.Router)();
 // All order routes require authentication
 orderRouter.use(auth_middleware_1.authenticate);
 // Customer
-orderRouter.post('/', (0, auth_middleware_1.authorize)('CUSTOMER'), OrderController.placeOrder);
+orderRouter.post('/', (0, auth_middleware_1.authorize)('CUSTOMER'), operating_hours_1.requireOperatingHours, OrderController.placeOrder);
 orderRouter.delete('/:id/cancel', (0, auth_middleware_1.authorize)('CUSTOMER'), OrderController.cancelOrder);
 orderRouter.post('/:id/rider-accept', OrderController.acceptOrder);
 orderRouter.get('/ready-for-pickup', async (req, res) => {
     const orders = await (0, order_service_1.getOrdersReadyForPickup)();
-    console.log(JSON.stringify);
     res.json({ success: true, data: orders });
 });
 const upload = (0, multer_1.default)({

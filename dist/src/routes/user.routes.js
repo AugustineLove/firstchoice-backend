@@ -41,6 +41,8 @@ const multer_1 = __importDefault(require("multer"));
 const UserController = __importStar(require("../controllers/user.controller"));
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const notification_service_1 = require("../services/notification.service");
+const prisma_1 = require("../config/prisma");
+// import { generateTelegramLink } from '../services/telegram.service';
 const userRouter = (0, express_1.Router)();
 const upload = (0, multer_1.default)({
     storage: multer_1.default.memoryStorage(),
@@ -77,6 +79,37 @@ userRouter.post('/me/fcm-token', auth_middleware_1.authenticate, async (req, res
         res.status(400).json({ success: false, message: err.message });
     }
 });
+userRouter.patch('/web-fcm-token', auth_middleware_1.authenticate, async (req, res) => {
+    try {
+        if (!req.body.token) {
+            res.status(400).json({ success: false, message: 'token required' });
+            return;
+        }
+        await prisma_1.prisma.user.update({ where: { id: req.user.id }, data: { webFcmToken: req.body.token } });
+        res.json({ success: true });
+    }
+    catch (err) {
+        console.error('[web-fcm-token] failed:', err.message);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+// userRouter.patch('/me/telegram-chat-id', authenticate, async (req: AuthRequest, res) => {
+//   try {
+//     if (!req.body.chatId) { res.status(400).json({ success: false, message: 'chatId required' }); return; }
+//     await prisma.user.update({ where: { id: req.user!.id }, data: { telegramChatId: String(req.body.chatId) } });
+//     res.json({ success: true });
+//   } catch (err: any) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// });
+// userRouter.get('/me/telegram-link', authenticate, async (req: AuthRequest, res) => {
+//   try {
+//     const link = await generateTelegramLink(req.user!.id);
+//     res.json({ success: true, data: { link } });
+//   } catch (err: any) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// });
 userRouter.get('/me', UserController.getMe);
 userRouter.patch('/me', UserController.updateProfile);
 userRouter.post('/me/avatar', upload.single('image'), UserController.uploadAvatar);
@@ -84,5 +117,6 @@ userRouter.patch('/me/password', UserController.changePassword);
 userRouter.get('/me/orders', UserController.getMyOrders);
 userRouter.get('/me/deliveries', UserController.getMyDeliveries);
 userRouter.get('/me/errands', UserController.getMyErrands);
+userRouter.delete('/me', auth_middleware_1.authenticate, UserController.deleteAccountHandler);
 exports.default = userRouter;
 //# sourceMappingURL=user.routes.js.map

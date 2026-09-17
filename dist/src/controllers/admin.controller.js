@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getOverviewStats = getOverviewStats;
+exports.overview = overview;
 exports.getAllUsers = getAllUsers;
 exports.updateUserStatus = updateUserStatus;
 exports.getAllVendors = getAllVendors;
@@ -44,19 +45,36 @@ exports.deleteVendorProduct = deleteVendorProduct;
 exports.getAllRiders = getAllRiders;
 exports.createVendor = createVendor;
 exports.assignRiderToOrder = assignRiderToOrder;
+exports.assignRiderToDelivery = assignRiderToDelivery;
+exports.updateOrderStatus = updateOrderStatus;
 exports.getOrderAnalytics = getOrderAnalytics;
 exports.getRiderAnalytics = getRiderAnalytics;
+exports.broadcastNotification = broadcastNotification;
+exports.riderInsights = riderInsights;
+exports.riderJobHistory = riderJobHistory;
+exports.riderDailyReport = riderDailyReport;
 const AdminService = __importStar(require("../services/admin.service"));
+const NotificationService = __importStar(require("../services/notification.service"));
+const rider_service_1 = require("../services/rider.service");
 function handleError(res, err) {
     res.status(400).json({ success: false, message: err.message || 'Something went wrong' });
 }
 async function getOverviewStats(req, res) {
     try {
-        const stats = await AdminService.getOverviewStats();
+        const stats = await AdminService.getAdminOverview();
         res.status(200).json({ success: true, data: stats });
     }
     catch (err) {
         res.status(400).json({ success: false, message: err.message });
+    }
+}
+async function overview(req, res) {
+    try {
+        const data = await AdminService.getAdminOverview();
+        res.json({ success: true, data });
+    }
+    catch (e) {
+        res.status(400).json({ success: false, message: e.message });
     }
 }
 async function getAllUsers(req, res) {
@@ -187,6 +205,57 @@ async function assignRiderToOrder(req, res) {
         res.status(400).json({ success: false, message: err.message });
     }
 }
+async function assignRiderToDelivery(req, res) {
+    try {
+        const { riderId } = req.body;
+        const deliveryId = (req.params.deliveryId || req.params.id);
+        if (!deliveryId) {
+            res.status(400).json({ success: false, message: 'deliveryId is required' });
+            return;
+        }
+        if (!riderId) {
+            res.status(400).json({ success: false, message: 'riderId is required' });
+            return;
+        }
+        const delivery = await AdminService.assignRiderToDelivery(deliveryId, riderId);
+        res.status(200).json({ success: true, data: delivery });
+    }
+    catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+}
+async function updateOrderStatus(req, res) {
+    try {
+        const { status, riderId } = req.body;
+        const orderId = (req.params.orderId || req.params.id);
+        if (!orderId) {
+            res.status(400).json({ success: false, message: 'orderId is required' });
+            return;
+        }
+        const validStatuses = [
+            'PENDING',
+            'ACCEPTED',
+            'RIDER_ASSIGNED',
+            'PICKED_UP',
+            'IN_TRANSIT',
+            'ARRIVED',
+            'DELIVERED',
+            'CANCELLED',
+        ];
+        if (!status || !validStatuses.includes(status)) {
+            res.status(400).json({
+                success: false,
+                message: `status is required and must be one of: ${validStatuses.join(', ')}`,
+            });
+            return;
+        }
+        const order = await AdminService.updateOrderStatusAdmin(orderId, status, { riderId });
+        res.status(200).json({ success: true, data: order });
+    }
+    catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+}
 async function getOrderAnalytics(req, res) {
     try {
         const analytics = await AdminService.getOrderAnalytics();
@@ -203,6 +272,61 @@ async function getRiderAnalytics(req, res) {
     }
     catch (err) {
         res.status(400).json({ success: false, message: err.message });
+    }
+}
+async function broadcastNotification(req, res) {
+    try {
+        const { title, message, role } = req.body;
+        if (!title?.trim() || !message?.trim()) {
+            return res.status(400).json({ success: false, message: 'Title and message are required' });
+        }
+        const result = await NotificationService.sendBroadcastNotification({
+            title: title.trim(),
+            body: message.trim(),
+            role: role || undefined,
+        });
+        return res.json({ success: true, data: result });
+    }
+    catch (err) {
+        return res.status(500).json({ success: false, message: err.message || 'Failed to send broadcast' });
+    }
+}
+async function riderInsights(req, res) {
+    try {
+        const data = await (0, rider_service_1.getRiderInsights)(req.params.id);
+        res.json({ success: true, data });
+    }
+    catch (e) {
+        res.status(400).json({ success: false, message: e.message });
+    }
+}
+async function riderJobHistory(req, res) {
+    try {
+        const { page, limit, kind, status } = req.query;
+        const data = await (0, rider_service_1.getRiderJobsPaginated)(req.params.id, {
+            page: page ? Number(page) : undefined,
+            limit: limit ? Number(limit) : undefined,
+            kind: kind,
+            status: status,
+        });
+        res.json({ success: true, data });
+    }
+    catch (e) {
+        res.status(400).json({ success: false, message: e.message });
+    }
+}
+async function riderDailyReport(req, res) {
+    try {
+        const { startDate, endDate, riderId } = req.query;
+        const data = await AdminService.getRiderDailyReport({
+            startDate: startDate,
+            endDate: endDate,
+            riderId: riderId,
+        });
+        res.json({ success: true, data });
+    }
+    catch (e) {
+        res.status(400).json({ success: false, message: e.message || 'Could not load report' });
     }
 }
 //# sourceMappingURL=admin.controller.js.map

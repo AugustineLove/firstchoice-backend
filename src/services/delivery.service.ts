@@ -10,6 +10,7 @@ import { logger } from '../middleware/logger.middleware';
 import { LOGISTICS_MANAGER_NUMBERS } from '../utils/constants';
 import { sendCustomerMessage } from './message.service';
 import { getSettings } from './setting.service';
+import { assignRiderToDelivery as adminAssignRiderToDelivery } from './admin.service';
 
 // function calculateDeliveryEstimate(
 //   pickupLat?: number,
@@ -90,7 +91,7 @@ function calculateDeliveryEstimate({
   pickupLng,
   destLat,
   destLng,
-}: {
+}: {   
   pickupLat?: number | null;
   pickupLng?: number | null;
   destLat?: number | null;
@@ -191,46 +192,7 @@ export async function assignRiderToDelivery(
   deliveryId: string,
   riderId: string
 ) {
-  const delivery = await prisma.deliveryRequest.findUnique({
-    where: { id: deliveryId },
-  });
-  if (!delivery) throw new Error('Delivery request not found');
-  if (delivery.status !== 'PENDING')
-    throw new Error('Can only assign rider to a pending delivery');
-
-  const rider = await prisma.rider.findUnique({ where: { id: riderId } });
-  if (!rider) throw new Error('Rider not found');
-  if (rider.availability !== 'ONLINE')
-    throw new Error('Rider is not available');
-
-  return prisma.$transaction(async (tx) => {
-    const updated = await tx.deliveryRequest.update({
-      where: { id: deliveryId },
-      data: {
-        assignedRiderId: riderId,
-        status: 'ACCEPTED',
-      },
-      include: {
-        customer: { select: { name: true, phone: true } },
-        rider: {
-          include: { user: { select: { name: true, phone: true } } },
-        },
-      },
-    });
-
-    await tx.rider.update({
-      where: { id: riderId },
-      data: { availability: 'BUSY' },
-    });
-
-    notifyUser(delivery.customerId, 'delivery:rider_assigned', {
-    deliveryId,
-    riderId,
-    timestamp: new Date(),
-  });
-
-    return updated;
-  });
+  return adminAssignRiderToDelivery(deliveryId, riderId);
 }
 
 export async function getAllDeliveries(filters: {

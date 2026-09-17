@@ -10,3 +10,11 @@ export declare function notifyVendorPendingApproval(businessName: string): Promi
 export declare function notifyNewErrand(errandId: string): Promise<void>;
 export declare function notifyErrandStatusChange(errandId: string, newStatus: string, customerId: string): Promise<void>;
 export declare function updateFcmToken(userId: string, token: string): Promise<void>;
+export declare function notifyRidersNewOrder(orderId: string): Promise<void>;
+export declare function sendBroadcastNotification(payload: {
+    title: string;
+    body: string;
+    role?: 'CUSTOMER' | 'VENDOR' | 'RIDER';
+}): Promise<{
+    total: number;
+}>;

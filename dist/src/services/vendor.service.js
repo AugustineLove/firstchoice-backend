@@ -40,8 +40,10 @@ exports.updateVendorProfile = updateVendorProfile;
 exports.getAllVendors = getAllVendors;
 exports.getVendorOrders = getVendorOrders;
 exports.getVendorStats = getVendorStats;
+exports.validateOpeningHours = validateOpeningHours;
 const prisma_1 = require("../config/prisma");
 const NotificationService = __importStar(require("./notification.service"));
+const hours_util_1 = require("../utils/hours.util");
 async function registerVendor(userId, data) {
     const existingVendor = await prisma_1.prisma.vendor.findUnique({ where: { userId } });
     if (existingVendor)
@@ -49,6 +51,7 @@ async function registerVendor(userId, data) {
     const user = await prisma_1.prisma.user.findUnique({ where: { id: userId } });
     if (!user)
         throw new Error('User not found');
+    const openingHours = data.openingHours ? validateOpeningHours(data.openingHours) : undefined;
     const vendor = await prisma_1.prisma.$transaction(async (tx) => {
         const newVendor = await tx.vendor.create({
             data: {
@@ -58,7 +61,7 @@ async function registerVendor(userId, data) {
                 address: data.address.trim(),
                 phone: data.phone.trim(),
                 logo: data.logo || null,
-                openingHours: data.openingHours || null,
+                openingHours: openingHours ?? undefined,
             },
         });
         await tx.user.update({
@@ -85,7 +88,7 @@ async function getVendorProfile(vendorId) {
     });
     if (!vendor)
         throw new Error('Vendor not found');
-    return vendor;
+    return { ...vendor, isOpen: (0, hours_util_1.isWithinHours)(vendor.openingHours) };
 }
 async function getMyVendorProfile(userId) {
     const vendor = await prisma_1.prisma.vendor.findUnique({
@@ -102,32 +105,40 @@ async function updateVendorProfile(userId, data) {
     const vendor = await prisma_1.prisma.vendor.findUnique({ where: { userId } });
     if (!vendor)
         throw new Error('Vendor profile not found');
-    return prisma_1.prisma.vendor.update({
-        where: { userId },
-        data,
-    });
+    // Basic sanity check: if provided, latitude/longitude must parse to real
+    // numbers within valid GPS ranges before we persist them.
+    if (data.latitude !== undefined) {
+        const lat = Number(data.latitude);
+        if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+            throw new Error('Invalid latitude value');
+        }
+    }
+    if (data.longitude !== undefined) {
+        const lng = Number(data.longitude);
+        if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
+            throw new Error('Invalid longitude value');
+        }
+    }
+    const payload = { ...data };
+    if (data.openingHours !== undefined) {
+        payload.openingHours = validateOpeningHours(data.openingHours);
+    }
+    return prisma_1.prisma.vendor.update({ where: { userId }, data: payload });
 }
 async function getAllVendors(filters) {
-    return prisma_1.prisma.vendor.findMany({
+    const vendors = await prisma_1.prisma.vendor.findMany({
         where: {
             status: 'ACTIVE',
             ...(filters.businessType && { businessType: filters.businessType }),
-            ...(filters.search && {
-                businessName: { contains: filters.search, mode: 'insensitive' },
-            }),
+            ...(filters.search && { businessName: { contains: filters.search, mode: 'insensitive' } }),
         },
         select: {
-            id: true,
-            businessName: true,
-            businessType: true,
-            address: true,
-            logo: true,
-            openingHours: true,
-            rating: true,
-            status: true,
+            id: true, businessName: true, businessType: true, address: true,
+            logo: true, openingHours: true, rating: true, status: true,
         },
         orderBy: { rating: 'desc' },
     });
+    return vendors.map((v) => ({ ...v, isOpen: (0, hours_util_1.isWithinHours)(v.openingHours) }));
 }
 async function getVendorOrders(userId) {
     const vendor = await prisma_1.prisma.vendor.findUnique({ where: { userId } });
@@ -175,5 +186,34 @@ async function getVendorStats(userId) {
         totalProducts,
         totalRevenue: revenue._sum.totalAmount || 0,
     };
+}
+const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
+function validateOpeningHours(hours) {
+    if (typeof hours !== 'object' || hours === null) {
+        throw new Error('openingHours must be an object keyed by day (0-6)');
+    }
+    const result = {};
+    for (const [day, ranges] of Object.entries(hours)) {
+        const dayNum = Number(day);
+        if (!Number.isInteger(dayNum) || dayNum < 0 || dayNum > 6) {
+            throw new Error(`Invalid day key "${day}" — must be 0-6`);
+        }
+        if (!Array.isArray(ranges)) {
+            throw new Error(`openingHours["${day}"] must be an array`);
+        }
+        result[day] = ranges.map((r) => {
+            if (!r || typeof r.start !== 'string' || typeof r.end !== 'string') {
+                throw new Error(`Invalid time range for day ${day}`);
+            }
+            if (!TIME_RE.test(r.start) || !TIME_RE.test(r.end)) {
+                throw new Error(`Times must be HH:mm — got "${r.start}"–"${r.end}"`);
+            }
+            if (r.start >= r.end) {
+                throw new Error(`Range start must be before end (day ${day})`);
+            }
+            return { start: r.start, end: r.end };
+        });
+    }
+    return result;
 }
 //# sourceMappingURL=vendor.service.js.map

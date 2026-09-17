@@ -9,8 +9,10 @@ exports.changePassword = changePassword;
 exports.getUserOrders = getUserOrders;
 exports.getUserDeliveries = getUserDeliveries;
 exports.getUserErrands = getUserErrands;
+exports.deleteAccount = deleteAccount;
 const prisma_1 = require("../config/prisma");
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const crypto_1 = __importDefault(require("crypto")); // add to top of file
 const PHONE_REGEX = /^(0|\+233)\d{9}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function normalizePhone(phone) {
@@ -151,5 +153,41 @@ async function getUserErrands(id) {
         where: { customerId: id },
         orderBy: { createdAt: 'desc' },
     });
+}
+async function deleteAccount(id, password) {
+    const user = await prisma_1.prisma.user.findUnique({ where: { id } });
+    if (!user)
+        throw new Error('User not found');
+    const isMatch = await bcryptjs_1.default.compare(password, user.passwordHash);
+    if (!isMatch)
+        throw new Error('Password is incorrect');
+    // A hard delete would violate FK constraints on Order/DeliveryRequest/
+    // Errand/VendorRating/ProductReview, and would destroy order records
+    // you need for accounting/disputes. Instead: wipe PII, permanently
+    // block login (random unusable password + DELETED status), and free
+    // up the phone/email so the person can sign up fresh if they want.
+    const anonymizedPhone = `deleted_${id}`;
+    const randomPassword = crypto_1.default.randomBytes(32).toString('hex');
+    const passwordHash = await bcryptjs_1.default.hash(randomPassword, 10);
+    await prisma_1.prisma.user.update({
+        where: { id },
+        data: {
+            name: 'Deleted User',
+            phone: anonymizedPhone,
+            email: null,
+            profileImage: null,
+            passwordHash,
+            status: 'DELETED',
+            fcmToken: null,
+            webFcmToken: null,
+            resetPasswordToken: null,
+            resetPasswordExpiry: null,
+            firebaseUid: null,
+            telegramChatId: null,
+            telegramLinkCode: null,
+            telegramLinkCodeExpiry: null,
+        },
+    });
+    return { message: 'Account deleted successfully' };
 }
 //# sourceMappingURL=user.service.js.map

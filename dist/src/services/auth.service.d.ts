@@ -44,4 +44,5 @@ export declare function resetPassword(token: string, newPassword: string): Promi
 }>;
 export declare function resetPasswordEmail(phone: string): Promise<{
     message: string;
+    email: string;
 }>;
