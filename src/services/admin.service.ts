@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { notifyAdmins, notifyRiders, notifyUser } from '../socket/socket.manager';
 import { validateOpeningHours } from './vendor.service';
 import { emitOrderEvent } from './order.service';
+import { getActiveManualJobs } from './manualjob.service';
 // ─── OVERVIEW STATS ─────────────────────────────────────
 
 export async function getOverviewStats() {
@@ -832,6 +833,130 @@ export async function updateOrderStatusAdmin(
   return updated;
 }
 
+export async function getDeliveryByIdAdmin(deliveryId: string) {
+  const delivery = await prisma.deliveryRequest.findUnique({
+    where: { id: deliveryId },
+    include: {
+      customer: { select: { id: true, name: true, phone: true } },
+      rider: { include: { user: { select: { id: true, name: true, phone: true } } } },
+    },
+  });
+  if (!delivery) throw new Error('Delivery request not found');
+  return delivery;
+}
+
+export async function updateDeliveryStatusAdmin(
+  deliveryId: string,
+  newStatus: DeliveryStatus,
+  options?: { riderId?: string }
+) {
+  if (!deliveryId) throw new Error('Delivery ID is required');
+
+  const validStatuses: DeliveryStatus[] = [
+    'PENDING', 'ACCEPTED', 'PICKED_UP', 'IN_TRANSIT', 'DELIVERED', 'CANCELLED',
+  ];
+  if (!validStatuses.includes(newStatus)) {
+    throw new Error(`Invalid delivery status. Must be one of: ${validStatuses.join(', ')}`);
+  }
+
+  const delivery = await prisma.deliveryRequest.findUnique({
+    where: { id: deliveryId },
+    include: {
+      customer: { select: { id: true, name: true, phone: true } },
+      rider: { include: { user: { select: { id: true, name: true, phone: true } } } },
+    },
+  });
+  if (!delivery) throw new Error('Delivery request not found');
+
+  let targetRiderId = options?.riderId !== undefined ? (options.riderId || null) : delivery.assignedRiderId;
+
+  if (options?.riderId) {
+    const riderExists = await prisma.rider.findUnique({ where: { id: options.riderId } });
+    if (!riderExists) throw new Error('Rider not found');
+  }
+
+  if (newStatus === 'PENDING') targetRiderId = null;
+
+  if (newStatus === 'ACCEPTED' && !targetRiderId) {
+    throw new Error('Rider ID is required to set status to ACCEPTED');
+  }
+  if (['PICKED_UP', 'IN_TRANSIT'].includes(newStatus) && !targetRiderId) {
+    throw new Error(`A rider must be assigned before setting delivery status to ${newStatus}`);
+  }
+
+  const previousRiderId = delivery.assignedRiderId;
+  const previousRiderUserId = delivery.rider?.user?.id;
+  const isRiderChanging = targetRiderId !== previousRiderId;
+  const totalFee = (delivery.deliveryFee ?? 0) + (delivery.errandFee ?? 0);
+
+  const updated = await prisma.$transaction(async (tx) => {
+    if (previousRiderId && (isRiderChanging || newStatus === 'PENDING' || newStatus === 'CANCELLED')) {
+      await tx.rider.update({ where: { id: previousRiderId }, data: { availability: 'ONLINE' } });
+    }
+
+    if (delivery.status === 'DELIVERED' && newStatus !== 'DELIVERED' && delivery.assignedRiderId) {
+      await tx.rider.update({
+        where: { id: delivery.assignedRiderId },
+        data: { totalDeliveries: { decrement: 1 }, earnings: { decrement: totalFee } },
+      });
+    }
+
+    if (targetRiderId) {
+      if (newStatus === 'DELIVERED' && delivery.status !== 'DELIVERED') {
+        await tx.rider.update({
+          where: { id: targetRiderId },
+          data: { totalDeliveries: { increment: 1 }, earnings: { increment: totalFee }, availability: 'ONLINE' },
+        });
+      } else if (newStatus === 'CANCELLED') {
+        await tx.rider.update({ where: { id: targetRiderId }, data: { availability: 'ONLINE' } });
+      } else if (['ACCEPTED', 'PICKED_UP', 'IN_TRANSIT'].includes(newStatus)) {
+        await tx.rider.update({ where: { id: targetRiderId }, data: { availability: 'BUSY' } });
+      }
+    }
+
+    return tx.deliveryRequest.update({
+      where: { id: deliveryId },
+      data: { status: newStatus, assignedRiderId: targetRiderId },
+      include: {
+        customer: { select: { id: true, name: true, phone: true } },
+        rider: { include: { user: { select: { id: true, name: true, phone: true } } } },
+      },
+    });
+  });
+
+  await NotificationService.notifyDeliveryStatusChange(deliveryId, newStatus);
+
+  if (newStatus === 'PENDING') {
+    notifyRiders('delivery:new_request', {
+      type: delivery.type === 'ERRAND' ? 'NEW_ERRAND' : 'NEW_DELIVERY',
+      deliveryId: delivery.id,
+      pickupAddress: delivery.pickupAddress,
+      destinationAddress: delivery.destinationAddress,
+      itemDescription: delivery.itemDescription,
+      estimatedFee: delivery.estimatedFee,
+      paymentMethod: delivery.paymentMethod,
+      customer: { name: delivery.recipientName || updated.customer?.name, phone: delivery.recipientPhone || updated.customer?.phone },
+      createdAt: delivery.createdAt,
+    });
+  }
+
+  if (isRiderChanging) {
+    if (previousRiderUserId) {
+      notifyUser(previousRiderUserId, 'delivery:unassigned', {
+        deliveryId, reason: 'Delivery reassigned or updated by admin', timestamp: new Date(),
+      });
+    }
+    if (targetRiderId && updated.rider?.user?.id) {
+      notifyUser(updated.rider.user.id, 'delivery:rider_assigned', { deliveryId, timestamp: new Date() });
+      notifyRiders('delivery:taken', { deliveryId });
+    }
+  }
+
+  notifyAdmins('admin:delivery_status_changed', { deliveryId, status: newStatus });
+
+  return updated;
+}
+
 // ─── PLATFORM ANALYTICS ─────────────────────────────────
 
 export async function getOrderAnalytics() {
@@ -1115,4 +1240,483 @@ export async function getRiderDailyReport(filters: {
   }), { jobs: 0, itemsSubtotal: 0, deliveryFees: 0, cashCollected: 0, momoCollected: 0, grandTotal: 0, netToRemit: 0 });
 
   return { rows, dailyTotals, overall, range: { start: start.toISOString(), end: end.toISOString() } };
+}
+
+export async function getDispatchQueue() {
+  const staleThresholdMinutes = 15;
+  const warnThresholdMinutes = 5;
+  const staleThreshold = new Date(Date.now() - staleThresholdMinutes * 60 * 1000);
+
+  const [pendingOrders, pendingDeliveries, pendingManualJobs] = await Promise.all([
+    prisma.order.findMany({
+      where: { orderStatus: 'PENDING' },
+      select: {
+        id: true, createdAt: true, deliveryAddress: true, totalAmount: true,
+        vendor: { select: { businessName: true, address: true } },
+        customer: { select: { name: true, phone: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    }),
+    prisma.deliveryRequest.findMany({
+      where: { status: 'PENDING' },
+      select: {
+        id: true, createdAt: true, pickupAddress: true, destinationAddress: true,
+        estimatedFee: true, type: true,
+        customer: { select: { name: true, phone: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    }),
+    getActiveManualJobs(),
+  ]);
+
+  const now = Date.now();
+  const ageOf = (d: Date) => Math.floor((now - d.getTime()) / 60000);
+
+  const items = [
+    ...pendingOrders.map(o => ({
+      kind: 'order' as const,
+      id: o.id,
+      customerName: o.customer?.name || null,
+      customerPhone: o.customer?.phone || null,
+      from: o.vendor?.businessName || o.vendor?.address || null,
+      to: o.deliveryAddress,
+      amount: o.totalAmount,
+      type: null as string | null,
+      createdAt: o.createdAt,
+      ageMinutes: ageOf(o.createdAt),
+    })),
+    ...pendingDeliveries.map(d => ({
+      kind: 'delivery' as const,
+      id: d.id,
+      customerName: d.customer?.name || null,
+      customerPhone: d.customer?.phone || null,
+      from: d.pickupAddress,
+      to: d.destinationAddress,
+      amount: d.estimatedFee,
+      type: d.type,
+      createdAt: d.createdAt,
+      ageMinutes: ageOf(d.createdAt),
+    })),
+   ...pendingManualJobs.map(j => ({
+      kind: 'manual' as const,
+      id: j.id,
+      customerName: j.customerName,
+      customerPhone: j.customerPhone,
+      from: j.pickupAddress,
+      to: j.destinationAddress,
+      amount: j.amount,
+      type: 'MANUAL' as string | null,
+      createdAt: j.createdAt,
+      ageMinutes: ageOf(j.createdAt),
+    })),
+  ].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  const withUrgency = items.map(i => ({
+    ...i,
+    urgency: i.ageMinutes >= staleThresholdMinutes ? 'stale' : i.ageMinutes >= warnThresholdMinutes ? 'warn' : 'fresh',
+  }));
+
+  return {
+    items: withUrgency,
+    totalPending: withUrgency.length,
+    staleCount: withUrgency.filter(i => i.urgency === 'stale').length,
+    warnCount: withUrgency.filter(i => i.urgency === 'warn').length,
+  };
+}
+
+const ACTIVE_ORDER_STATUSES: OrderStatus[] = [
+  'PENDING', 'ACCEPTED', 'RIDER_ASSIGNED', 'PICKED_UP', 'IN_TRANSIT', 'ARRIVED',
+];
+
+const ACTIVE_DELIVERY_STATUSES: DeliveryStatus[] = [
+  'PENDING', 'ACCEPTED', 'PICKED_UP', 'IN_TRANSIT',
+];
+
+// Statuses where the rider is still heading TO the pickup point.
+const PRE_PICKUP = new Set<string>(['PENDING', 'ACCEPTED', 'RIDER_ASSIGNED']);
+
+export async function getLiveMapData() {
+  const now = Date.now();
+  const ageOf = (d: Date) => Math.floor((now - d.getTime()) / 60000);
+ 
+  const [riders, orders, deliveries, manualJobs] = await Promise.all([
+    prisma.rider.findMany({
+      select: {
+        id: true, availability: true, rating: true, totalDeliveries: true,
+        currentLatitude: true, currentLongitude: true,
+        user: { select: { id: true, name: true, phone: true, profileImage: true } },
+      },
+    }),
+    prisma.order.findMany({
+      where: { orderStatus: { in: ACTIVE_ORDER_STATUSES } },
+      select: {
+        id: true, createdAt: true, orderStatus: true, riderId: true,
+        totalAmount: true, deliveryFee: true, paymentMethod: true, notes: true,
+        deliveryAddress: true, deliveryLatitude: true, deliveryLongitude: true,
+        pickupLatitude: true, pickupLongitude: true, vendorAddress: true,
+        vendor: { select: { businessName: true, address: true, phone: true } },
+        customer: { select: { name: true, phone: true } },
+        recipientName: true, recipientPhone: true,
+        _count: { select: { items: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    }),
+    prisma.deliveryRequest.findMany({
+      where: { status: { in: ACTIVE_DELIVERY_STATUSES } },
+      select: {
+        id: true, createdAt: true, status: true, type: true, assignedRiderId: true,
+        estimatedFee: true, deliveryFee: true, errandFee: true, itemsEstimatedTotal: true,
+        paymentMethod: true, itemDescription: true,
+        pickupAddress: true, pickupLatitude: true, pickupLongitude: true,
+        destinationAddress: true, destinationLatitude: true, destinationLongitude: true,
+        customer: { select: { name: true, phone: true } },
+        recipientName: true, recipientPhone: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    }),
+    getActiveManualJobs(),
+  ]);
+
+  const orderJobs = orders.map((o) => ({
+    kind: 'order' as const,
+    id: o.id,
+    label: o.vendor?.businessName || o.vendorAddress || 'Order',
+    subtype: 'MARKETPLACE',
+    status: o.orderStatus as string,
+    unassigned: !o.riderId,
+    riderId: o.riderId,
+    amount: o.totalAmount ?? 0,
+    fee: o.deliveryFee ?? 0,
+    paymentMethod: o.paymentMethod,
+    itemCount: o._count.items,
+    note: o.notes || null,
+    customerName: o.recipientName || o.customer?.name || null,
+    customerPhone: o.recipientPhone || o.customer?.phone || null,
+    createdAt: o.createdAt,
+    ageMinutes: ageOf(o.createdAt),
+    pickup: {
+      label: o.vendor?.businessName || 'Vendor',
+      address: o.vendor?.address || o.vendorAddress || null,
+      phone: o.vendor?.phone || null,
+      latitude: o.pickupLatitude,
+      longitude: o.pickupLongitude,
+    },
+    dropoff: {
+      label: o.recipientName || o.customer?.name || 'Customer',
+      address: o.deliveryAddress,
+      phone: o.recipientPhone || o.customer?.phone || null,
+      latitude: o.deliveryLatitude,
+      longitude: o.deliveryLongitude,
+    },
+    legFromRider: PRE_PICKUP.has(o.orderStatus) ? ('pickup' as const) : ('dropoff' as const),
+  }));
+
+  const deliveryJobs = deliveries.map((d) => ({
+    kind: 'delivery' as const,
+    id: d.id,
+    label: d.type === 'ERRAND' ? 'Errand' : (d.customer?.name || 'Delivery'),
+    subtype: d.type as string,
+    status: d.status as string,
+    unassigned: !d.assignedRiderId,
+    riderId: d.assignedRiderId,
+    amount: (d.estimatedFee ?? 0) + (d.itemsEstimatedTotal ?? 0),
+    fee: d.estimatedFee ?? 0,
+    paymentMethod: d.paymentMethod,
+    itemCount: null as number | null,
+    note: d.itemDescription || null,
+    customerName: d.recipientName || d.customer?.name || null,
+    customerPhone: d.recipientPhone || d.customer?.phone || null,
+    createdAt: d.createdAt,
+    ageMinutes: ageOf(d.createdAt),
+    pickup: {
+      label: d.type === 'ERRAND' ? 'Errand pickup' : 'Pickup',
+      address: d.pickupAddress,
+      phone: null as string | null,
+      latitude: d.pickupLatitude,
+      longitude: d.pickupLongitude,
+    },
+    dropoff: {
+      label: d.recipientName || d.customer?.name || 'Customer',
+      address: d.destinationAddress,
+      phone: d.recipientPhone || d.customer?.phone || null,
+      latitude: d.destinationLatitude,
+      longitude: d.destinationLongitude,
+    },
+    legFromRider: PRE_PICKUP.has(d.status) ? ('pickup' as const) : ('dropoff' as const),
+  }));
+
+  const manualJobJobs = manualJobs.map((j) => ({
+  kind: 'manual' as const,
+  id: j.id,
+  label: j.customerName || 'Off-book job',
+  subtype: 'MANUAL',
+  status: j.status as string,
+  unassigned: !j.assignedRiderId,
+  riderId: j.assignedRiderId,
+  amount: j.amount ?? 0,
+  fee: j.amount ?? 0,
+  paymentMethod: j.paymentMethod,
+  itemCount: null as number | null,
+  note: j.itemDescription || j.rawNote || null,
+  customerName: j.customerName,
+  customerPhone: j.customerPhone,
+  createdAt: j.createdAt,
+  ageMinutes: ageOf(j.createdAt),
+  pickup: {
+    label: 'Pickup',
+    address: j.pickupAddress,
+    phone: null as string | null,
+    latitude: j.pickupLatitude,
+    longitude: j.pickupLongitude,
+  },
+  dropoff: {
+    label: j.customerName || 'Customer',
+    address: j.destinationAddress,
+    phone: j.customerPhone,
+    latitude: j.destinationLatitude,
+    longitude: j.destinationLongitude,
+  },
+  legFromRider: PRE_PICKUP.has(j.status) ? ('pickup' as const) : ('dropoff' as const),
+}));
+
+  const jobs = [...orderJobs, ...deliveryJobs, ...manualJobJobs].sort(
+    (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
+  );
+
+  // Jobs currently on each rider's plate, so the map can label a busy pin
+  // with what it's actually carrying.
+  const loadByRider: Record<string, { id: string; kind: string; status: string }[]> = {};
+  for (const j of jobs) {
+    if (!j.riderId) continue;
+    (loadByRider[j.riderId] ??= []).push({ id: j.id, kind: j.kind, status: j.status });
+  }
+
+  const mappedRiders = riders
+    .filter((r) => r.currentLatitude != null && r.currentLongitude != null)
+    .map((r) => ({
+      id: r.id,
+      userId: r.user?.id,
+      name: r.user?.name,
+      phone: r.user?.phone,
+      photo: r.user?.profileImage || null,
+      availability: r.availability,
+      rating: r.rating,
+      totalDeliveries: r.totalDeliveries,
+      latitude: r.currentLatitude,
+      longitude: r.currentLongitude,
+      activeJobs: loadByRider[r.id] || [],
+    }));
+
+  const pending = jobs.filter((j) => j.unassigned);
+
+  return {
+    riders: mappedRiders,
+    jobs,
+    stats: {
+      online: mappedRiders.filter((r) => r.availability === 'ONLINE').length,
+      busy: mappedRiders.filter((r) => r.availability === 'BUSY').length,
+      offline: mappedRiders.filter((r) => r.availability === 'OFFLINE').length,
+      unassigned: pending.length,
+      inFlight: jobs.length - pending.length,
+      // Anything waiting 15+ minutes with nobody on it.
+      stale: pending.filter((j) => j.ageMinutes >= 15).length,
+      unmapped:
+        jobs.filter((j) => j.pickup.latitude == null || j.dropoff.latitude == null).length,
+    },
+    generatedAt: new Date(),
+  };
+}
+
+// ─── GLOBAL SEARCH ──────────────────────────────────────
+
+type SearchHit = {
+  type: 'order' | 'delivery' | 'user' | 'vendor' | 'rider';
+  id: string;
+  title: string;
+  subtitle: string;
+  meta: string | null;
+  status: string | null;
+  section: string;          // which dashboard section to open
+  exact: boolean;           // exact id/phone match → ranks first
+};
+
+const looksLikeId = (q: string) => /^c[a-z0-9]{20,}$/i.test(q);
+const looksLikePhone = (q: string) => /^[\d+\s()-]{6,}$/.test(q);
+const digits = (s: string) => s.replace(/\D/g, '');
+
+export async function globalSearch(rawQuery: string, limit = 6) {
+  const q = (rawQuery || '').trim();
+  if (q.length < 2) return { hits: [], query: q };
+
+  const ci = { contains: q, mode: 'insensitive' as const };
+  const isId = looksLikeId(q);
+  const phone = looksLikePhone(q) ? digits(q) : null;
+
+  // An exact-ish id lookup short-circuits everything else.
+  if (isId) {
+    const [order, delivery, user, vendor] = await Promise.all([
+      prisma.order.findUnique({
+        where: { id: q },
+        select: {
+          id: true, orderStatus: true, totalAmount: true, deliveryAddress: true,
+          vendor: { select: { businessName: true } },
+          customer: { select: { name: true, phone: true } },
+        },
+      }),
+      prisma.deliveryRequest.findUnique({
+        where: { id: q },
+        select: {
+          id: true, status: true, type: true, estimatedFee: true,
+          pickupAddress: true, destinationAddress: true,
+          customer: { select: { name: true, phone: true } },
+        },
+      }),
+      prisma.user.findUnique({
+        where: { id: q },
+        select: { id: true, name: true, phone: true, email: true, role: true, status: true },
+      }),
+      prisma.vendor.findUnique({
+        where: { id: q },
+        select: { id: true, businessName: true, businessType: true, phone: true, status: true },
+      }),
+    ]);
+
+    const hits: SearchHit[] = [];
+    if (order) hits.push(orderHit(order, true));
+    if (delivery) hits.push(deliveryHit(delivery, true));
+    if (user) hits.push(userHit(user, true));
+    if (vendor) hits.push(vendorHit(vendor, true));
+    if (hits.length) return { hits, query: q };
+    // fall through to fuzzy if the id matched nothing
+  }
+
+  const [orders, deliveries, users, vendors] = await Promise.all([
+    prisma.order.findMany({
+      where: {
+        OR: [
+          { id: ci },
+          { deliveryAddress: ci },
+          { recipientName: ci },
+          ...(phone ? [{ recipientPhone: { contains: phone } }] : []),
+          { customer: { OR: [{ name: ci }, { phone: ci }] } },
+          { vendor: { businessName: ci } },
+        ],
+      },
+      select: {
+        id: true, orderStatus: true, totalAmount: true, deliveryAddress: true, createdAt: true,
+        vendor: { select: { businessName: true } },
+        customer: { select: { name: true, phone: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    }),
+
+    prisma.deliveryRequest.findMany({
+      where: {
+        OR: [
+          { id: ci },
+          { pickupAddress: ci },
+          { destinationAddress: ci },
+          { itemDescription: ci },
+          { recipientName: ci },
+          ...(phone ? [{ recipientPhone: { contains: phone } }] : []),
+          { customer: { OR: [{ name: ci }, { phone: ci }] } },
+        ],
+      },
+      select: {
+        id: true, status: true, type: true, estimatedFee: true, createdAt: true,
+        pickupAddress: true, destinationAddress: true,
+        customer: { select: { name: true, phone: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    }),
+
+    prisma.user.findMany({
+      where: { OR: [{ name: ci }, { phone: ci }, { email: ci }, { id: ci }] },
+      select: {
+        id: true, name: true, phone: true, email: true, role: true, status: true,
+        rider: { select: { id: true, availability: true, totalDeliveries: true, rating: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    }),
+
+    prisma.vendor.findMany({
+      where: {
+        OR: [
+          { businessName: ci }, { phone: ci }, { address: ci }, { id: ci },
+          { user: { OR: [{ name: ci }, { phone: ci }] } },
+        ],
+      },
+      select: { id: true, businessName: true, businessType: true, phone: true, status: true },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    }),
+  ]);
+
+  const hits: SearchHit[] = [
+    ...orders.map((o) => orderHit(o, o.id === q)),
+    ...deliveries.map((d) => deliveryHit(d, d.id === q)),
+    ...users.map((u) => userHit(u, u.id === q || (!!phone && digits(u.phone) === phone))),
+    ...vendors.map((v) => vendorHit(v, v.id === q)),
+  ];
+
+  hits.sort((a, b) => Number(b.exact) - Number(a.exact));
+
+  return { hits, query: q };
+}
+
+/* ── hit shapers ── */
+function orderHit(o: any, exact: boolean): SearchHit {
+  return {
+    type: 'order',
+    id: o.id,
+    title: `Order · ${o.vendor?.businessName || 'Unknown vendor'}`,
+    subtitle: `${o.customer?.name || 'Customer'} → ${o.deliveryAddress || '—'}`,
+    meta: `GHS ${Number(o.totalAmount || 0).toFixed(2)}`,
+    status: o.orderStatus,
+    section: 'orders',
+    exact,
+  };
+}
+
+function deliveryHit(d: any, exact: boolean): SearchHit {
+  return {
+    type: 'delivery',
+    id: d.id,
+    title: d.type === 'ERRAND' ? 'Errand' : 'Delivery',
+    subtitle: `${d.pickupAddress || '—'} → ${d.destinationAddress || '—'}`,
+    meta: `GHS ${Number(d.estimatedFee || 0).toFixed(2)} · ${d.customer?.name || ''}`.trim(),
+    status: d.status,
+    section: 'deliveries',
+    exact,
+  };
+}
+
+function userHit(u: any, exact: boolean): SearchHit {
+  const isRider = u.role === 'RIDER' && u.rider;
+  return {
+    type: isRider ? 'rider' : 'user',
+    // Riders open in the Riders section, which keys off Rider.id, not User.id.
+    id: isRider ? u.rider.id : u.id,
+    title: u.name,
+    subtitle: [u.phone, u.email].filter(Boolean).join(' · '),
+    meta: isRider ? `⭐ ${(u.rider.rating || 0).toFixed(1)} · ${u.rider.totalDeliveries} trips` : u.role,
+    status: isRider ? u.rider.availability : u.status,
+    section: isRider ? 'riders' : 'users',
+    exact,
+  };
+}
+
+function vendorHit(v: any, exact: boolean): SearchHit {
+  return {
+    type: 'vendor',
+    id: v.id,
+    title: v.businessName,
+    subtitle: `${v.businessType} · ${v.phone}`,
+    meta: null,
+    status: v.status,
+    section: 'vendors',
+    exact,
+  };
 }

@@ -4,6 +4,7 @@ import * as SettingsController from '../controllers/settings.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { getAdminSettings, patchAdminSettings } from '../controllers/settings.controller';
 import { updateClosingStatus } from '../services/setting.service';
+import { parseOffBookText } from '../services/manualjob.service';
 
 const adminRouter = Router();
 
@@ -44,14 +45,28 @@ adminRouter.patch('/orders/:orderId/assign', AdminController.assignRiderToOrder)
 adminRouter.patch('/orders/:orderId/status', AdminController.updateOrderStatus);
 
 // Delivery assignment
+adminRouter.get('/deliveries/:deliveryId', AdminController.getDeliveryById);
 adminRouter.patch('/deliveries/:deliveryId/assign', AdminController.assignRiderToDelivery);
+adminRouter.patch('/deliveries/:deliveryId/status', AdminController.updateDeliveryStatus);
 
 // Analytics
 adminRouter.get('/analytics/orders', AdminController.getOrderAnalytics);
 adminRouter.get('/analytics/riders', AdminController.getRiderAnalytics);
 
+adminRouter.get('/dispatch/queue', AdminController.getDispatchQueue);
 // Broadcast notifications
 adminRouter.post('/broadcast', AdminController.broadcastNotification);
+
+adminRouter.get('/logs', AdminController.getActivityLogs);
+// admin.routes.ts — alongside your other admin routes
+adminRouter.get('/search', authenticate, authorize('ADMIN'), AdminController.searchAll);
+adminRouter.get('/dispatch/map', AdminController.getLiveMapData);
+
+// wire into your admin router, alongside /admin/orders and /admin/deliveries
+adminRouter.post('/manual-jobs/parse', authenticate, authorize('ADMIN'), parseOffBookText);
+adminRouter.post('/manual-jobs', authenticate, authorize('ADMIN'), AdminController.createManualJob);
+adminRouter.post('/manual-jobs/:id/assign-rider', authenticate, authorize('ADMIN'), AdminController.assignRiderToManualJobCon);
+adminRouter.patch('/manual-jobs/:id/status', authenticate, authorize('ADMIN'), AdminController.updateMJobStatus);
 
 adminRouter.patch('/admin/closing-status', 
   authenticate, 
