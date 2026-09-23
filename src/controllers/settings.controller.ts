@@ -57,3 +57,17 @@ export async function clearOperatingOverride(req: Request, res: Response) {
     return res.status(400).json({ success: false, message: err.message });
   }
 }
+
+// controllers/settings.controller.ts
+export async function setClosingStatus(req: Request, res: Response) {
+  try {
+    const { isClosed, closedMessage } = req.body;
+    if (typeof isClosed !== 'boolean') {
+      return res.status(400).json({ success: false, message: 'isClosed must be a boolean' });
+    }
+    const updated = await SettingsService.updateClosingStatus(isClosed, closedMessage ?? null);
+    res.json({ success: true, data: updated });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message || 'Could not update closing status' });
+  }
+}

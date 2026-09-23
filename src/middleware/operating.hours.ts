@@ -64,21 +64,20 @@ function isWithinOperatingHours(): { open: boolean; nextWindow?: TimeWindow } {
 
 export async function requireOperatingHours(req: Request, res: Response, next: NextFunction) {
   try {
-    const { open, nextWindow } = await getOperatingStatus();
+    const { open, nextWindow, isClosed, closedMessage } = await getOperatingStatus();
 
     if (!open) {
-      return res.status(403).json({
-        success: false,
-        message: nextWindow
+      const message = isClosed
+        ? (closedMessage || 'We are currently not accepting orders. Please check back later.')
+        : nextWindow
           ? `We're currently closed. We'll reopen today at ${formatTime(nextWindow.start)}.`
-          : `We're currently closed. Please check back during our working hours.`,
-      });
+          : `We're currently closed. Please check back during our working hours.`;
+
+      return res.status(403).json({ success: false, message });
     }
 
     next();
   } catch (err) {
-    // A DB/cache hiccup here shouldn't block every order in the app —
-    // log it and let the request through rather than fail-closed.
     console.error('[operatingHours] check failed, allowing request through:', err);
     next();
   }
