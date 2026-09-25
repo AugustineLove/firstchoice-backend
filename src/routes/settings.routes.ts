@@ -6,6 +6,6 @@ import { authorize } from '../middleware/auth.middleware';
 const settingsRouter = Router();
 
 settingsRouter.get('/errand', getErrandSettings);
-settingsRouter.patch('/closing-status', authorize('ADMIN'), setClosingStatus);
+settingsRouter.patch('/closing-status', setClosingStatus);
 
 export default settingsRouter;
