@@ -34,11 +34,11 @@ async function buildUserResponse(user: any) {
 
 function generateTokens(userId: string, role: Role) {
   const accessToken = jwt.sign({ id: userId, role }, JWT_SECRET, {
-    expiresIn: '10d',
+    expiresIn: '100d',
   });
 
   const refreshToken = jwt.sign({ id: userId, role }, JWT_REFRESH_SECRET, {
-    expiresIn: '7d',
+    expiresIn: '70d',
   });
 
   return { accessToken, refreshToken };
