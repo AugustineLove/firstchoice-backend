@@ -83,6 +83,7 @@ export async function resetPassword(req: Request, res: Response) {
   // const error = validateResetPassword(req.body.phone);
   // console.log(`Error: ${error}`)
   // if (error) { res.status(400).json({ success: false, message: error }); return; }
+  console.log('Reset password request received:', req.body);
   try {
     await AuthService.resetPassword(req.body.token, req.body.password);
     res.status(200).json({ success: true, message: 'Password reset successfully' });

@@ -135,13 +135,15 @@ export async function resetPassword(
   newPassword: string
 ) {
 
+  console.log(`User found for token:  ? user.id : 'none'}`);
+
   const user = await prisma.user.findFirst({
     where: {
       resetPasswordToken: token,
     },
   });
 
-
+  
   if (!user) {
     throw new Error("Invalid or expired reset link");
   }
