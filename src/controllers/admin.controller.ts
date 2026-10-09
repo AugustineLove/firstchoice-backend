@@ -463,3 +463,17 @@ export async function updateMJobStatus(req: Request, res: Response) {
     res.status(400).json({ success: false, message: e.message });
   }
 }
+
+export async function resetUserPassword(req: AuthRequest, res: Response) {
+  try {
+    const { password } = req.body ?? {};
+    if (password !== undefined && (typeof password !== 'string' || (password.trim() && password.trim().length < 6))) {
+      res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+      return;
+    }
+    const data = await AdminService.resetUserPassword(req.user!.id, req.params.userId as string, password);
+    res.json({ success: true, data });
+  } catch (err: any) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+}

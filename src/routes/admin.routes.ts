@@ -121,4 +121,7 @@ adminRouter.delete('/operating-override', authorize('ADMIN'), SettingsController
 // Report generation
 adminRouter.get('/reports/riders/daily', AdminController.riderDailyReport);
 
+
+adminRouter.post('/users/:userId/reset-password', AdminController.resetUserPassword);
+
 export default adminRouter;

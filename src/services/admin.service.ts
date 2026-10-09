@@ -1720,3 +1720,48 @@ function vendorHit(v: any, exact: boolean): SearchHit {
     exact,
   };
 }
+
+export async function resetUserPassword(
+  adminId: string,
+  userId: string,
+  newPassword?: string,
+) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new Error('User not found');
+  if (user.status === 'DELETED') throw new Error('Cannot reset password for a deleted account');
+  if (user.id === adminId) throw new Error('Use your own change-password flow for your account');
+
+  const generated = !newPassword?.trim();
+  const plain = generated ? crypto.randomBytes(4).toString('hex') : newPassword!.trim();
+  if (plain.length < 6) throw new Error('Password must be at least 6 characters');
+
+  const passwordHash = await bcrypt.hash(plain, 10);
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash,
+        // kill any pending self-service reset link
+        resetPasswordToken: null,
+        resetPasswordExpiry: null,
+      },
+    }),
+    prisma.adminActionLog.create({
+      data: {
+        adminId,
+        action: 'USER_PASSWORD_RESET',
+        targetType: 'User',
+        targetId: userId,
+        summary: `Reset password for ${user.name} (${user.phone})`,
+        metadata: { generated }, // never log the password itself
+      },
+    }),
+  ]);
+
+  return {
+    user: { id: user.id, name: user.name, phone: user.phone, role: user.role },
+    generated,
+    tempPassword: generated ? plain : undefined, // only returned when we made it up
+  };
+}

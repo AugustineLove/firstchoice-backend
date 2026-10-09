@@ -452,6 +452,7 @@ enum AdminActionType {
   PRODUCT_CREATED
   PRODUCT_DELETED
   BROADCAST_SENT
+  USER_PASSWORD_RESET
 }
 
 model AdminActionLog {
