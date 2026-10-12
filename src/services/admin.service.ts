@@ -1070,16 +1070,41 @@ export async function createVendorWithOwner(data: {
   return { vendor, tempPassword };
 }
 
+function parseCoordinate(value: unknown, kind: 'latitude' | 'longitude'): string | null {
+  if (value === null || value === '' ) return null;               // clears it
+  const n = Number(value);
+  const max = kind === 'latitude' ? 90 : 180;
+  if (!Number.isFinite(n) || n < -max || n > max) throw new Error(`Invalid ${kind} value`);
+  return String(n);
+}
+
 export async function updateVendorProfile(
   vendorId: string,
-  data: { businessName?: string; businessType?: string; address?: string; phone?: string; openingHours?: unknown; logo?: string; }
+  data: {
+    businessName?: string; businessType?: string; address?: string; phone?: string;
+    openingHours?: unknown; logo?: string | null;
+    latitude?: string | null; longitude?: string | null;
+  }
 ) {
   const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
   if (!vendor) throw new Error('Vendor not found');
 
-  const payload: any = { ...data };
-  if (data.openingHours !== undefined) {
-    payload.openingHours = validateOpeningHours(data.openingHours);
+  const payload: Record<string, any> = {};
+  if (data.businessName !== undefined) {
+    if (!data.businessName.trim()) throw new Error('Business name is required');
+    payload.businessName = data.businessName.trim();
+  }
+  if (data.businessType !== undefined) payload.businessType = data.businessType.trim();
+  if (data.address      !== undefined) payload.address      = data.address.trim();
+  if (data.phone        !== undefined) payload.phone        = data.phone.trim();
+  if (data.logo         !== undefined) payload.logo         = data.logo || null;
+  if (data.openingHours !== undefined) payload.openingHours = validateOpeningHours(data.openingHours);
+  if (data.latitude     !== undefined) payload.latitude     = parseCoordinate(data.latitude, 'latitude');
+  if (data.longitude    !== undefined) payload.longitude    = parseCoordinate(data.longitude, 'longitude');
+
+  if ((payload.latitude === null) !== (payload.longitude === null)
+      && 'latitude' in payload && 'longitude' in payload) {
+    throw new Error('Set both latitude and longitude, or clear both');
   }
 
   return prisma.vendor.update({
