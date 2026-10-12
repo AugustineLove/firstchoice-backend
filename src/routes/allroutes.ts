@@ -11,6 +11,7 @@ import transactionRouter from "./transaction.routes";
 import adminRouter from "./admin.routes";
 import locationRouter from "./location.routes";
 import settingsRouter from "./settings.routes";
+import prosRouter from "./pros.routes";
 import { getOperatingStatus } from "../controllers/settings.controller";
 
 const allRoutes = Router();
@@ -29,5 +30,6 @@ allRoutes.use('/admin', adminRouter);
 allRoutes.use('/api/locations', locationRouter);
 allRoutes.use('/api/settings', settingsRouter); 
 allRoutes.get('/api/operating-status', getOperatingStatus);
+allRoutes.get('/api/pros', prosRouter)
 
 export default allRoutes;

@@ -5,12 +5,14 @@ import { authenticate, authorize } from '../middleware/auth.middleware';
 import { getAdminSettings, patchAdminSettings } from '../controllers/settings.controller';
 import { updateClosingStatus } from '../services/setting.service';
 import { parseOffBookText } from '../services/manualjob.service';
+import { updateServiceFlags } from '../services/service-flags.service';
+import { registerProsAdminRoutes } from '../services/pros.service';
 
 const adminRouter = Router();
 
 // All admin routes — locked to ADMIN role
 adminRouter.use(authenticate, authorize('ADMIN'));
-
+registerProsAdminRoutes(adminRouter);
 // Overview
 adminRouter.get('/stats', AdminController.getOverviewStats);
 adminRouter.get('/overview', AdminController.overview);
@@ -123,5 +125,13 @@ adminRouter.get('/reports/riders/daily', AdminController.riderDailyReport);
 
 
 adminRouter.post('/users/:userId/reset-password', AdminController.resetUserPassword);
-
+adminRouter.patch('/services', async (req, res) => {
+  try {
+    const data = await updateServiceFlags(req.body);
+    res.json({ success: true, data });
+  } catch (e: any) {
+    res.status(400).json({ success: false, message: e.message });
+  }
+});
+  
 export default adminRouter;

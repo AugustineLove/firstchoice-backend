@@ -128,6 +128,11 @@ model User {
   adminActions AdminActionLog[]
   manualJobsCreated ManualJob[]
 
+  hotelBookings      HotelBooking[]
+  serviceJobs        ServiceJob[]
+  rideRequests       RideRequest[]
+  propertyEnquiries  PropertyEnquiry[]
+
 }
 
 model Rider {
@@ -400,6 +405,7 @@ model Settings {
   closedMessage           String?           
   
   updatedAt               DateTime          @updatedAt
+  enabledServices    Json?
 }
 
 model Errand {
@@ -510,4 +516,290 @@ model ManualJob {
   updatedAt             DateTime        @updatedAt
 
   @@index([status])
+}
+
+
+enum ListingStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+}
+
+enum ServiceJobStatus {
+  PENDING
+  QUOTED
+  ACCEPTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum RideVehicleType {
+  TRICYCLE
+  MOTORBIKE
+  TAXI
+  TRUCK
+  OTHER
+}
+
+enum RideStatus {
+  PENDING
+  ACCEPTED
+  ARRIVED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum PropertyType {
+  SINGLE_ROOM
+  CHAMBER_AND_HALL
+  SELF_CONTAINED
+  APARTMENT
+  HOUSE
+  SHOP_STORE
+  OTHER
+}
+
+enum EnquiryStatus {
+  NEW
+  CONTACTED
+  VIEWING_SCHEDULED
+  CLOSED
+}
+
+enum BookingStatus { 
+  PENDING 
+  CONFIRMED 
+  CHECKED_IN 
+  COMPLETED 
+  CANCELLED 
+  REJECTED 
+}
+
+model Hotel {
+  id          String         @id @default(cuid())
+  name        String
+  description String?
+  address     String
+  area        String?
+  latitude    Float?
+  longitude   Float?
+  phone       String
+  images      String[]       @default([])
+  amenities   String[]       @default([])
+  rating      Float          @default(0)
+  status      ListingStatus  @default(DRAFT)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  roomTypes   RoomType[]
+  bookings    HotelBooking[]
+
+  @@index([status])
+}
+
+model RoomType {
+  id            String         @id @default(cuid())
+  hotelId       String
+  hotel         Hotel          @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  name          String         // "Standard", "Executive", "Self-contained"
+  description   String?
+  pricePerNight Float
+  capacity      Int            @default(2)
+  totalRooms    Int            @default(1)   // how many of this type exist
+  images        String[]       @default([])
+  amenities     String[]       @default([])
+  available     Boolean        @default(true)
+
+  bookings      HotelBooking[]
+}
+
+model HotelBooking {
+  id            String        @id @default(cuid())
+  customerId    String
+  customer      User          @relation(fields: [customerId], references: [id])
+  hotelId       String
+  hotel         Hotel         @relation(fields: [hotelId], references: [id])
+  roomTypeId    String
+  roomType      RoomType      @relation(fields: [roomTypeId], references: [id])
+
+  checkIn       DateTime
+  checkOut      DateTime
+  guests        Int           @default(1)
+  rooms         Int           @default(1)
+  nights        Int
+  totalAmount   Float         // pricePerNight * nights * rooms, frozen at booking time
+
+  guestName     String
+  guestPhone    String
+  notes         String?
+
+  paymentMethod PaymentMethod @default(CASH)
+  paymentStatus PaymentStatus @default(PENDING)
+  status        BookingStatus @default(PENDING)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([hotelId, checkIn, checkOut])
+  @@index([customerId])
+}
+
+model Trade {
+  id            String         @id @default(cuid())
+  name          String         @unique   // "Electrician"
+  icon          String?                  // emoji or icon key
+  active        Boolean        @default(true)
+  sortOrder     Int            @default(0)
+
+  professionals Professional[]
+  jobs          ServiceJob[]
+}
+
+model Professional {
+  id           String        @id @default(cuid())
+  name         String
+  phone        String
+  photo        String?
+  bio          String?
+  area         String?
+  yearsExp     Int?
+  rating       Float         @default(0)
+  totalJobs    Int           @default(0)
+  verified     Boolean       @default(false)
+  availability RiderAvailability @default(OFFLINE) // reuse ONLINE/BUSY/OFFLINE
+  status       ListingStatus @default(DRAFT)
+  createdAt    DateTime      @default(now())
+
+  trades       Trade[]
+  jobs         ServiceJob[]
+}
+
+model ServiceJob {
+  id             String           @id @default(cuid())
+  customerId     String
+  customer       User             @relation(fields: [customerId], references: [id])
+  tradeId        String
+  trade          Trade            @relation(fields: [tradeId], references: [id])
+  professionalId String?
+  professional   Professional?    @relation(fields: [professionalId], references: [id])
+
+  description    String
+  address        String
+  latitude       Float?
+  longitude      Float?
+  isUrgent       Boolean          @default(false)
+  preferredTime  DateTime?
+  imageUrls      String[]         @default([])
+
+  quotedAmount   Float?           // pro/admin quotes after seeing the description
+  finalAmount    Float?
+  paymentMethod  PaymentMethod    @default(CASH)
+  status         ServiceJobStatus @default(PENDING)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([status])
+  @@index([customerId])
+}
+
+
+model Driver {
+  id                 String            @id @default(cuid())
+  name               String
+  phone              String
+  photo              String?
+  vehicleType        RideVehicleType
+  vehicleDescription String?           // "Red Aboboyaa, 3-seater"
+  plateNumber        String?
+  rating             Float             @default(0)
+  totalRides         Int               @default(0)
+  availability       RiderAvailability @default(OFFLINE)
+  currentLatitude    Float?
+  currentLongitude   Float?
+  verified           Boolean           @default(false)
+  status             ListingStatus     @default(DRAFT)
+  createdAt          DateTime          @default(now())
+
+  rides              RideRequest[]
+}
+
+// Admin-editable fares per vehicle type — no redeploy to change prices.
+model RideRate {
+  vehicleType RideVehicleType @id
+  baseFare    Float           @default(5)
+  perKm       Float           @default(2)
+  minFare     Float           @default(5)
+  active      Boolean         @default(true)
+}
+
+model RideRequest {
+  id                   String          @id @default(cuid())
+  customerId           String
+  customer             User            @relation(fields: [customerId], references: [id])
+  driverId             String?
+  driver               Driver?         @relation(fields: [driverId], references: [id])
+
+  vehicleType          RideVehicleType
+  passengers           Int             @default(1)
+  pickupAddress        String
+  pickupLatitude       Float?
+  pickupLongitude      Float?
+  destinationAddress   String
+  destinationLatitude  Float?
+  destinationLongitude Float?
+  notes                String?         // e.g. "I have luggage", "need a truck for 20 bags of cement"
+
+  estimatedFare        Float
+  finalFare            Float?
+  paymentMethod        PaymentMethod   @default(CASH)
+  status               RideStatus      @default(PENDING)
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  @@index([status])
+  @@index([customerId])
+}
+
+model Property {
+  id             String            @id @default(cuid())
+  title          String
+  description    String?
+  type           PropertyType
+  rentAmount     Float                         // per month, GHS
+  advanceMonths  Int               @default(12) // how many months landlord asks upfront
+  bedrooms       Int?
+  bathrooms      Int?
+  address        String
+  area           String?
+  latitude       Float?
+  longitude      Float?
+  images         String[]          @default([])
+  amenities      String[]          @default([])  // "Water", "Prepaid meter", "Fenced", "Tiled"
+
+  // Landlord contact is held server-side and only released after an enquiry
+  contactName    String
+  contactPhone   String
+
+  status         ListingStatus     @default(DRAFT)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  enquiries      PropertyEnquiry[]
+
+  @@index([status, type])
+}
+
+model PropertyEnquiry {
+  id                String        @id @default(cuid())
+  propertyId        String
+  property          Property      @relation(fields: [propertyId], references: [id])
+  customerId        String
+  customer          User          @relation(fields: [customerId], references: [id])
+  message           String?
+  preferredViewing  DateTime?
+  status            EnquiryStatus @default(NEW)
+  createdAt         DateTime      @default(now())
+
+  @@unique([propertyId, customerId])   // one live enquiry per person per listing
 }
