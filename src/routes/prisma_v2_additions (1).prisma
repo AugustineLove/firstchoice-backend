@@ -1,0 +1,268 @@
+// ═══════════════════════════════════════════════════════════════
+// FirstChoice 2.0 — ADDITIVE ONLY. Nothing existing is renamed,
+// retyped or removed, so v1.x apps keep working untouched.
+//
+// 1) Add these relation lines inside `model User`:
+//      hotelBookings      HotelBooking[]
+//      proReviews         ProfessionalReview[]
+//      proCalls           ProfessionalCall[]
+//      rideRequests       RideRequest[]
+//      propertyEnquiries  PropertyEnquiry[]
+//
+// 2) Add this nullable field inside `model Settings`:
+//      enabledServices    Json?   // { modes: {HOTEL:"OFF|BETA|ON",...}, betaUserIds: [] }
+//
+// 3) Paste everything below at the end of schema.prisma, then:
+//      npx prisma migrate dev --name v2_services
+// ═══════════════════════════════════════════════════════════════
+
+enum ListingStatus { DRAFT ACTIVE INACTIVE }
+
+// ─── HOTELS ─────────────────────────────────────────────────────
+
+enum BookingStatus { PENDING CONFIRMED CHECKED_IN COMPLETED CANCELLED REJECTED }
+
+model Hotel {
+  id          String         @id @default(cuid())
+  name        String
+  description String?
+  address     String
+  area        String?
+  latitude    Float?
+  longitude   Float?
+  phone       String
+  images      String[]       @default([])
+  amenities   String[]       @default([])
+  rating      Float          @default(0)
+  status      ListingStatus  @default(DRAFT)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  roomTypes   RoomType[]
+  bookings    HotelBooking[]
+
+  @@index([status])
+}
+
+model RoomType {
+  id            String         @id @default(cuid())
+  hotelId       String
+  hotel         Hotel          @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  name          String         // "Standard", "Executive", "Self-contained"
+  description   String?
+  pricePerNight Float
+  capacity      Int            @default(2)
+  totalRooms    Int            @default(1)   // how many of this type exist
+  images        String[]       @default([])
+  amenities     String[]       @default([])
+  available     Boolean        @default(true)
+
+  bookings      HotelBooking[]
+}
+
+model HotelBooking {
+  id            String        @id @default(cuid())
+  customerId    String
+  customer      User          @relation(fields: [customerId], references: [id])
+  hotelId       String
+  hotel         Hotel         @relation(fields: [hotelId], references: [id])
+  roomTypeId    String
+  roomType      RoomType      @relation(fields: [roomTypeId], references: [id])
+
+  checkIn       DateTime
+  checkOut      DateTime
+  guests        Int           @default(1)
+  rooms         Int           @default(1)
+  nights        Int
+  totalAmount   Float         // pricePerNight * nights * rooms, frozen at booking time
+
+  guestName     String
+  guestPhone    String
+  notes         String?
+
+  paymentMethod PaymentMethod @default(CASH)
+  paymentStatus PaymentStatus @default(PENDING)
+  status        BookingStatus @default(PENDING)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([hotelId, checkIn, checkOut])
+  @@index([customerId])
+}
+
+// ─── PROFESSIONALS (a directory: browse a trade, compare ratings, call directly) ───
+// Trades are DATA, not an enum: add "Mason" tomorrow with no migration.
+
+model Trade {
+  id            String         @id @default(cuid())
+  name          String         @unique   // "Electrician"
+  icon          String?                  // emoji
+  active        Boolean        @default(true)
+  sortOrder     Int            @default(0)
+
+  professionals Professional[]
+}
+
+model Professional {
+  id          String               @id @default(cuid())
+  name        String
+  phone       String
+  whatsapp    String?                       // falls back to phone when empty
+  photo       String?
+  bio         String?
+  area        String?                       // "Agona Nkwanta & surroundings"
+  yearsExp    Int?
+  priceNote   String?                       // free text: "From GHS 80 per visit"
+  rating      Float                @default(0)
+  reviewCount Int                  @default(0)
+  verified    Boolean              @default(false)
+  status      ListingStatus        @default(DRAFT)
+  createdAt   DateTime             @default(now())
+
+  trades      Trade[]
+  reviews     ProfessionalReview[]
+  calls       ProfessionalCall[]
+
+  @@index([status])
+}
+
+// One review per customer per pro. Only customers who tapped Call/WhatsApp can review,
+// which keeps fake reviews out.
+model ProfessionalReview {
+  id             String       @id @default(cuid())
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  customerId     String
+  customer       User         @relation(fields: [customerId], references: [id])
+  rating         Int          // 1-5, enforced in the service layer
+  comment        String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([professionalId, customerId])
+}
+
+// Logged when a customer taps Call/WhatsApp. Unlocks reviewing, and later gives pros
+// real numbers ("42 people contacted you this month").
+model ProfessionalCall {
+  id             String       @id @default(cuid())
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  customerId     String
+  customer       User         @relation(fields: [customerId], references: [id])
+  createdAt      DateTime     @default(now())
+
+  @@index([professionalId, customerId])
+}
+
+// ─── RIDES ──────────────────────────────────────────────────────
+// Separate Driver table on purpose: delivery riders must never leak into
+// ride dispatch, and admin "online riders" stats stay accurate.
+
+enum RideVehicleType { TRICYCLE MOTORBIKE TAXI TRUCK OTHER }
+enum RideStatus { PENDING ACCEPTED ARRIVED IN_PROGRESS COMPLETED CANCELLED }
+
+model Driver {
+  id                 String            @id @default(cuid())
+  name               String
+  phone              String
+  photo              String?
+  vehicleType        RideVehicleType
+  vehicleDescription String?           // "Red Aboboyaa, 3-seater"
+  plateNumber        String?
+  rating             Float             @default(0)
+  totalRides         Int               @default(0)
+  availability       RiderAvailability @default(OFFLINE)
+  currentLatitude    Float?
+  currentLongitude   Float?
+  verified           Boolean           @default(false)
+  status             ListingStatus     @default(DRAFT)
+  createdAt          DateTime          @default(now())
+
+  rides              RideRequest[]
+}
+
+// Admin-editable fares per vehicle type — no redeploy to change prices.
+model RideRate {
+  vehicleType RideVehicleType @id
+  baseFare    Float           @default(5)
+  perKm       Float           @default(2)
+  minFare     Float           @default(5)
+  active      Boolean         @default(true)
+}
+
+model RideRequest {
+  id                   String          @id @default(cuid())
+  customerId           String
+  customer             User            @relation(fields: [customerId], references: [id])
+  driverId             String?
+  driver               Driver?         @relation(fields: [driverId], references: [id])
+
+  vehicleType          RideVehicleType
+  passengers           Int             @default(1)
+  pickupAddress        String
+  pickupLatitude       Float?
+  pickupLongitude      Float?
+  destinationAddress   String
+  destinationLatitude  Float?
+  destinationLongitude Float?
+  notes                String?         // e.g. "I have luggage", "need a truck for 20 bags of cement"
+
+  estimatedFare        Float
+  finalFare            Float?
+  paymentMethod        PaymentMethod   @default(CASH)
+  status               RideStatus      @default(PENDING)
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  @@index([status])
+  @@index([customerId])
+}
+
+// ─── HOUSE RENTALS ──────────────────────────────────────────────
+
+enum PropertyType { SINGLE_ROOM CHAMBER_AND_HALL SELF_CONTAINED APARTMENT HOUSE SHOP_STORE OTHER }
+enum EnquiryStatus { NEW CONTACTED VIEWING_SCHEDULED CLOSED }
+
+model Property {
+  id             String            @id @default(cuid())
+  title          String
+  description    String?
+  type           PropertyType
+  rentAmount     Float                         // per month, GHS
+  advanceMonths  Int               @default(12) // how many months landlord asks upfront
+  bedrooms       Int?
+  bathrooms      Int?
+  address        String
+  area           String?
+  latitude       Float?
+  longitude      Float?
+  images         String[]          @default([])
+  amenities      String[]          @default([])  // "Water", "Prepaid meter", "Fenced", "Tiled"
+
+  // Landlord contact is held server-side and only released after an enquiry
+  contactName    String
+  contactPhone   String
+
+  status         ListingStatus     @default(DRAFT)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  enquiries      PropertyEnquiry[]
+
+  @@index([status, type])
+}
+
+model PropertyEnquiry {
+  id                String        @id @default(cuid())
+  propertyId        String
+  property          Property      @relation(fields: [propertyId], references: [id])
+  customerId        String
+  customer          User          @relation(fields: [customerId], references: [id])
+  message           String?
+  preferredViewing  DateTime?
+  status            EnquiryStatus @default(NEW)
+  createdAt         DateTime      @default(now())
+
+  @@unique([propertyId, customerId])   // one live enquiry per person per listing
+}
