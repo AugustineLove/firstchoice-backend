@@ -136,6 +136,25 @@ export async function adminCreateTrade(data: { name: string; icon?: string; sort
   return prisma.trade.create({ data: { name, icon: data.icon || null, sortOrder: data.sortOrder ?? 0 } });
 }
  
+export async function adminListTrades() {
+  return prisma.trade.findMany({
+    orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    include: { _count: { select: { professionals: true } } },
+  });
+}
+ 
+export async function adminUpdateTrade(id: string, data: Record<string, any>) {
+  const payload: Record<string, any> = {};
+  if (data.name !== undefined) {
+    if (!String(data.name).trim()) throw new Error('Trade name is required');
+    payload.name = String(data.name).trim();
+  }
+  if (data.icon !== undefined) payload.icon = data.icon || null;
+  if (data.active !== undefined) payload.active = !!data.active;
+  if (data.sortOrder !== undefined) payload.sortOrder = Number(data.sortOrder) || 0;
+  return prisma.trade.update({ where: { id }, data: payload });
+}
+ 
 export async function adminListProfessionals(f: { status?: string; tradeId?: string }) {
   return prisma.professional.findMany({
     where: { ...(f.status && { status: f.status as any }), ...(f.tradeId && { trades: { some: { id: f.tradeId } } }) },
@@ -175,7 +194,7 @@ export async function adminUpdateProfessional(id: string, data: Record<string, a
   if (Array.isArray(data.tradeIds)) payload.trades = { set: data.tradeIds.map((t: string) => ({ id: t })) };
   return prisma.professional.update({ where: { id }, data: payload, include: { trades: true } });
 }
-
+ 
 /* ═══════════════════════ CONTROLLER HELPER ═══════════════════════ */
 
 const h =
@@ -195,6 +214,8 @@ const h =
 
 export function registerProsAdminRoutes(adminRouter: Router) {
   adminRouter.post('/trades', h((req) => adminCreateTrade(req.body), 201));
+  adminRouter.get('/trades', h(() => adminListTrades()));
+  adminRouter.patch('/trades/:id', h((req) => adminUpdateTrade(req.params.id as string, req.body)));
   adminRouter.get('/pros', h((req) => adminListProfessionals({
     status: req.query.status as string | undefined, tradeId: req.query.tradeId as string | undefined,
   })));
