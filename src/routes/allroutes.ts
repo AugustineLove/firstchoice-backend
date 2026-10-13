@@ -31,7 +31,7 @@ allRoutes.use('/admin', adminRouter);
 allRoutes.use('/api/locations', locationRouter);
 allRoutes.use('/api/settings', settingsRouter); 
 allRoutes.get('/api/operating-status', getOperatingStatus);
-allRoutes.use('/api/pros', prosRouter)
-allRoutes.use('/api/rides', ridesRouter)
+allRoutes.use('/api/pros', prosRouter);
+allRoutes.use('/api/rides', ridesRouter);
 
 export default allRoutes;
