@@ -13,6 +13,7 @@ import locationRouter from "./location.routes";
 import settingsRouter from "./settings.routes";
 import prosRouter from "./pros.routes";
 import { getOperatingStatus } from "../controllers/settings.controller";
+import ridesRouter from "./rides.routes";
 
 const allRoutes = Router();
 
@@ -31,5 +32,6 @@ allRoutes.use('/api/locations', locationRouter);
 allRoutes.use('/api/settings', settingsRouter); 
 allRoutes.get('/api/operating-status', getOperatingStatus);
 allRoutes.use('/api/pros', prosRouter)
+allRoutes.use('/api/rides', ridesRouter)
 
 export default allRoutes;
