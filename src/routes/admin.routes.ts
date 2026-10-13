@@ -7,12 +7,14 @@ import { updateClosingStatus } from '../services/setting.service';
 import { parseOffBookText } from '../services/manualjob.service';
 import { updateServiceFlags } from '../services/service-flags.service';
 import { registerProsAdminRoutes } from '../services/pros.service';
+import { registerRidesAdminRoutes } from '../services/rides.service';
 
 const adminRouter = Router();
 
 // All admin routes — locked to ADMIN role
 adminRouter.use(authenticate, authorize('ADMIN'));
 registerProsAdminRoutes(adminRouter);
+registerRidesAdminRoutes(adminRouter); 
 // Overview
 adminRouter.get('/stats', AdminController.getOverviewStats);
 adminRouter.get('/overview', AdminController.overview);
