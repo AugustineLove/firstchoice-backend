@@ -47,7 +47,7 @@ export async function listProfessionals(q: {
     q.sort === 'reviews' ? [{ reviewCount: 'desc' }, { rating: 'desc' }]
     : q.sort === 'experience' ? [{ yearsExp: { sort: 'desc', nulls: 'last' } }, { rating: 'desc' }]
     : q.sort === 'new' ? [{ createdAt: 'desc' }]
-    : [{ verified: 'desc' }, { rating: 'desc' }, { reviewCount: 'desc' }]; // default: top rated
+    : [{ verified: 'desc' }, { rating: 'desc' }, { reviewCount: 'desc' }];
  
   const [pros, total] = await Promise.all([
     prisma.professional.findMany({ where, orderBy, skip: (page - 1) * limit, take: limit, select: proSelect }),

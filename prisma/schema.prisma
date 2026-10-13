@@ -34,13 +34,14 @@ enum VendorStatus {
   INACTIVE
   PENDING
 }
+
 enum OrderStatus {
   PENDING
   ACCEPTED
   RIDER_ASSIGNED
   PICKED_UP
   IN_TRANSIT
-  ARRIVED 
+  ARRIVED
   DELIVERED
   CANCELLED
 }
@@ -103,18 +104,18 @@ model User {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  rider        Rider?
-  vendor       Vendor?
-  orders       Order[]
-  deliveries   DeliveryRequest[]
-  errands      Errand[]
+  rider      Rider?
+  vendor     Vendor?
+  orders     Order[]
+  deliveries DeliveryRequest[]
+  errands    Errand[]
 
-  fcmToken   String?
+  fcmToken     String?
   webFcmToken  String?
   fcmUpdatedAt DateTime? @updatedAt
 
-  resetPasswordToken   String?
-  resetPasswordExpiry  DateTime?
+  resetPasswordToken  String?
+  resetPasswordExpiry DateTime?
 
   firebaseUid String? @unique
 
@@ -125,18 +126,16 @@ model User {
   telegramLinkCode       String?   @unique
   telegramLinkCodeExpiry DateTime?
 
-  adminActions AdminActionLog[]
+  adminActions      AdminActionLog[]
   manualJobsCreated ManualJob[]
 
-  hotelBookings      HotelBooking[]
-  serviceJobs        ServiceJob[]
-  rideRequests       RideRequest[]
-  propertyEnquiries  PropertyEnquiry[]
+  hotelBookings     HotelBooking[]
+  serviceJobs       ServiceJob[]
+  rideRequests      RideRequest[]
+  propertyEnquiries PropertyEnquiry[]
 
-
-  proReviews         ProfessionalReview[]
-  proCalls           ProfessionalCall[]
-
+  proReviews ProfessionalReview[]
+  proCalls   ProfessionalCall[]
 }
 
 model Rider {
@@ -153,36 +152,36 @@ model Rider {
   earnings         Float             @default(0)
   createdAt        DateTime          @default(now())
 
-  orders           Order[]
-  deliveries       DeliveryRequest[]
+  orders     Order[]
+  deliveries DeliveryRequest[]
   manualJobs ManualJob[]
 }
 
 model Vendor {
-  id           String       @id @default(cuid())
-  userId       String       @unique
-  user         User         @relation(fields: [userId], references: [id])
-  businessName String
-  businessType String
-  address      String
-  phone        String
-  logo         String?
-  openingHours Json?
-  openingHours_old  String?
-  status       VendorStatus @default(PENDING)
-  rating       Float        @default(0)
-  createdAt    DateTime     @default(now())
-  ratings      VendorRating[]
-  products     Product[]
-  orders       Order[]
-  longitude    String?
-  latitude     String?
+  id               String         @id @default(cuid())
+  userId           String         @unique
+  user             User           @relation(fields: [userId], references: [id])
+  businessName     String
+  businessType     String
+  address          String
+  phone            String
+  logo             String?
+  openingHours     Json?
+  openingHours_old String?
+  status           VendorStatus   @default(PENDING)
+  rating           Float          @default(0)
+  createdAt        DateTime       @default(now())
+  ratings          VendorRating[]
+  products         Product[]
+  orders           Order[]
+  longitude        String?
+  latitude         String?
 }
 
 model Product {
-  id          String   @id @default(cuid())
-  vendorId    String
-  vendor      Vendor   @relation(fields: [vendorId], references: [id])
+  id       String @id @default(cuid())
+  vendorId String
+  vendor   Vendor @relation(fields: [vendorId], references: [id])
 
   // Core
   name        String
@@ -194,74 +193,74 @@ model Product {
   available   Boolean  @default(true)
 
   // Rich fields
-  preparationTime Int?      // minutes — food/pharmacy
-  calories        Int?      // food
-  weight          Float?    // grocery/pharmacy (grams)
-  volume          Float?    // drinks/pharmacy (ml)
-  unit            String?   // "kg", "ml", "pcs", "pack", etc.
-  brand           String?   // grocery/pharmacy/electronics
-  expiryInfo      String?   // pharmacy/grocery
-  sku             String?   // electronics/boutique
-  sizes           String[]  // boutique (XS/S/M/L/XL)
-  colors          String[]  // boutique
-  tags            String[]  // spicy, vegan, halal, gluten-free, etc.
-  isPopular       Boolean   @default(false)
-  isFeatured      Boolean   @default(false)
+  preparationTime Int? // minutes — food/pharmacy
+  calories        Int? // food
+  weight          Float? // grocery/pharmacy (grams)
+  volume          Float? // drinks/pharmacy (ml)
+  unit            String? // "kg", "ml", "pcs", "pack", etc.
+  brand           String? // grocery/pharmacy/electronics
+  expiryInfo      String? // pharmacy/grocery
+  sku             String? // electronics/boutique
+  sizes           String[] // boutique (XS/S/M/L/XL)
+  colors          String[] // boutique
+  tags            String[] // spicy, vegan, halal, gluten-free, etc.
+  isPopular       Boolean  @default(false)
+  isFeatured      Boolean  @default(false)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  orderItems      OrderItem[]
-  variantGroups   ProductVariantGroup[]
-  addonGroups     ProductAddonGroup[]
-  attributes      ProductAttribute[]
-  reviews         ProductReview[]
+  orderItems    OrderItem[]
+  variantGroups ProductVariantGroup[]
+  addonGroups   ProductAddonGroup[]
+  attributes    ProductAttribute[]
+  reviews       ProductReview[]
 }
 
 model ProductVariantGroup {
   id        String           @id @default(cuid())
   productId String
   product   Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
-  name      String           // "Size", "Weight", "Volume", "Storage", "Color"
+  name      String // "Size", "Weight", "Volume", "Storage", "Color"
   required  Boolean          @default(true)
   variants  ProductVariant[]
 }
 
 model ProductVariant {
-  id        String              @id @default(cuid())
-  groupId   String
-  group     ProductVariantGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  name      String              // "Small", "Medium", "Large", "500g", "256GB", "Midnight Black"
-  priceAdjustment Float         @default(0) // +/- from base price
-  available Boolean             @default(true)
-  images    String[]            @default([]) // variant-specific gallery, e.g. per-colour shots.
-                                               // Falls back to the parent product's images
-                                               // on the frontend when empty.
+  id              String              @id @default(cuid())
+  groupId         String
+  group           ProductVariantGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  name            String // "Small", "Medium", "Large", "500g", "256GB", "Midnight Black"
+  priceAdjustment Float               @default(0) // +/- from base price
+  available       Boolean             @default(true)
+  images          String[]            @default([]) // variant-specific gallery, e.g. per-colour shots.
+  // Falls back to the parent product's images
+  // on the frontend when empty.
 }
 
 model ProductAddonGroup {
-  id         String         @id @default(cuid())
-  productId  String
-  product    Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
-  name       String         // "Extras", "Toppings", "Drinks"
-  minSelect  Int            @default(0)
-  maxSelect  Int            @default(10)
-  incrementable Boolean   @default(false)
-  incrementMode String?      // "multiple" | "free" | "halves" | "custom"
+  id                   String  @id @default(cuid())
+  productId            String
+  product              Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name                 String // "Extras", "Toppings", "Drinks"
+  minSelect            Int     @default(0)
+  maxSelect            Int     @default(10)
+  incrementable        Boolean @default(false)
+  incrementMode        String? // "multiple" | "free" | "halves" | "custom"
   customIncrementValue Float? // flat GHS amount added per extra unit when incrementMode == "custom"
 
-  addons     ProductAddon[]
+  addons ProductAddon[]
 }
 
 model ProductAddon {
-  id        String            @id @default(cuid())
-  groupId   String
-  group     ProductAddonGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  name      String            // "Egg", "Plantain", "Sausage"
-  price     Float             @default(0)
-  available Boolean           @default(true)
-  incrementable Boolean       @default(false)
-  incrementMode String?       // "multiple" | "free" | "halves" | "custom"
+  id                   String            @id @default(cuid())
+  groupId              String
+  group                ProductAddonGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  name                 String // "Egg", "Plantain", "Sausage"
+  price                Float             @default(0)
+  available            Boolean           @default(true)
+  incrementable        Boolean           @default(false)
+  incrementMode        String? // "multiple" | "free" | "halves" | "custom"
   // Pricing formulas (qty = quantity selected, base = price above):
   //   multiple -> base * qty
   //   free     -> base + (qty - 1) * 1
@@ -274,7 +273,7 @@ model ProductAttribute {
   id        String  @id @default(cuid())
   productId String
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  key       String  // "Brand", "Manufacturer", "Storage", "Ingredients"
+  key       String // "Brand", "Manufacturer", "Storage", "Ingredients"
   value     String
 }
 
@@ -287,8 +286,8 @@ model ProductReview {
   product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   customerId String
   customer   User     @relation(fields: [customerId], references: [id])
-  orderId    String?  // optional: order this review is tied to, for a future "verified purchase" badge
-  rating     Int      // 1–5, enforced in the service layer
+  orderId    String? // optional: order this review is tied to, for a future "verified purchase" badge
+  rating     Int // 1–5, enforced in the service layer
   comment    String?
   images     String[] @default([])
   createdAt  DateTime @default(now())
@@ -316,20 +315,19 @@ model Order {
   recipientPhone  String?
   deliveryAddress String
 
-  imageUrl        String?
+  imageUrl      String?
   vendorAddress String?
-  notes           String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  items           OrderItem[]
-  transaction     Transaction?
-  deliveryLatitude    Float?
-  deliveryLongitude   Float?
+  items             OrderItem[]
+  transaction       Transaction?
+  deliveryLatitude  Float?
+  deliveryLongitude Float?
 
-  pickupLatitude    Float?
-  pickupLongitude   Float?
-
+  pickupLatitude  Float?
+  pickupLongitude Float?
 }
 
 model OrderItem {
@@ -341,88 +339,88 @@ model OrderItem {
   quantity  Int
   unitPrice Float
 
-  selectedVariants Json?  // [{ groupName: "Size", variantName: "Large", priceAdjustment: 5 }]
-  selectedAddons   Json?  // [{ groupName: "Extras", addonName: "Egg", price: 2 }, ...]
+  selectedVariants Json? // [{ groupName: "Size", variantName: "Large", priceAdjustment: 5 }]
+  selectedAddons   Json? // [{ groupName: "Extras", addonName: "Egg", price: 2 }, ...]
   itemNotes        String? // "No pepper please"
 }
 
 model DeliveryRequest {
-  id                  String         @id @default(cuid())
-  customerId          String
-  customer            User           @relation(fields: [customerId], references: [id])
-  assignedRiderId     String?
-  rider               Rider?         @relation(fields: [assignedRiderId], references: [id])
+  id              String  @id @default(cuid())
+  customerId      String
+  customer        User    @relation(fields: [customerId], references: [id])
+  assignedRiderId String?
+  rider           Rider?  @relation(fields: [assignedRiderId], references: [id])
 
-  type                DeliveryKind   @default(PICKUP)   // ← new
+  type DeliveryKind @default(PICKUP) // ← new
 
-  pickupAddress       String
-  pickupLatitude      Float?
-  pickupLongitude     Float?
+  pickupAddress   String
+  pickupLatitude  Float?
+  pickupLongitude Float?
 
-  destinationAddress  String
+  destinationAddress   String
   destinationLatitude  Float?
   destinationLongitude Float?
 
-  itemDescription     String                              // for PICKUP; auto-summarized for ERRAND
-  errandItems         Json?                                // ← new: string[] of errand lines
-  itemsEstimatedTotal Float     @default(0) 
-  deliveryFee         Float          @default(0)          // ← new: distance-based portion
-  errandFee           Float          @default(0)          // ← new: fixed or per-item portion
-  estimatedFee        Float                                // = deliveryFee + errandFee (kept for compatibility)
+  itemDescription     String // for PICKUP; auto-summarized for ERRAND
+  errandItems         Json? // ← new: string[] of errand lines
+  itemsEstimatedTotal Float  @default(0)
+  deliveryFee         Float  @default(0) // ← new: distance-based portion
+  errandFee           Float  @default(0) // ← new: fixed or per-item portion
+  estimatedFee        Float // = deliveryFee + errandFee (kept for compatibility)
 
-  paymentMethod       PaymentMethod  @default(CASH)
-  status              DeliveryStatus @default(PENDING)
-  createdAt           DateTime       @default(now())
-  updatedAt           DateTime       @updatedAt
+  paymentMethod PaymentMethod  @default(CASH)
+  status        DeliveryStatus @default(PENDING)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
-  recipientName   String?
-  recipientPhone  String?
-  imageUrl        String?
+  recipientName  String?
+  recipientPhone String?
+  imageUrl       String?
 }
 
 model Location {
-  id        String     @id @default(cuid())
+  id        String   @id @default(cuid())
   name      String
   address   String
   latitude  Float
   longitude Float
-  isActive  Boolean    @default(true)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  usedAsErrandPickupBy Settings[]      // ← new
+  usedAsErrandPickupBy Settings[] // ← new
 }
 
 model Settings {
-  id                      Int               @id @default(1)
-  errandPricingMode       ErrandPricingMode @default(FIXED)
-  errandFixedPrice        Float             @default(20)
-  errandPerItemPrice      Float             @default(5)
-  errandPickupLocationId  String?
-  errandPickupLocation    Location?         @relation(fields: [errandPickupLocationId], references: [id])
+  id                     Int               @id @default(1)
+  errandPricingMode      ErrandPricingMode @default(FIXED)
+  errandFixedPrice       Float             @default(20)
+  errandPerItemPrice     Float             @default(5)
+  errandPickupLocationId String?
+  errandPickupLocation   Location?         @relation(fields: [errandPickupLocationId], references: [id])
 
-  operatingHours          Json?             // { "0": [{start,end}], "1": [...], ... } — null = use defaults
-  overrideActive          Boolean           @default(false)
-  overrideExpiresAt       DateTime?         // when the manual "accept orders anyway" window ends
-  
-  isClosed                Boolean           @default(false)
-  closedMessage           String?           
-  
-  updatedAt               DateTime          @updatedAt
-  enabledServices    Json?
+  operatingHours    Json? // { "0": [{start,end}], "1": [...], ... } — null = use defaults
+  overrideActive    Boolean   @default(false)
+  overrideExpiresAt DateTime? // when the manual "accept orders anyway" window ends
+
+  isClosed      Boolean @default(false)
+  closedMessage String?
+
+  updatedAt       DateTime @updatedAt
+  enabledServices Json?
 }
 
 model Errand {
-  id               String       @id @default(cuid())
-  customerId       String
-  customer         User         @relation(fields: [customerId], references: [id])
-  description      String
-  instructions     String?
-  budget           Float
-  pickupLocation   String?
-  status           ErrandStatus @default(PENDING)
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  id             String       @id @default(cuid())
+  customerId     String
+  customer       User         @relation(fields: [customerId], references: [id])
+  description    String
+  instructions   String?
+  budget         Float
+  pickupLocation String?
+  status         ErrandStatus @default(PENDING)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 }
 
 model Transaction {
@@ -441,7 +439,7 @@ model VendorRating {
   vendor     Vendor   @relation(fields: [vendorId], references: [id])
   customerId String
   customer   User     @relation(fields: [customerId], references: [id])
-  rating     Int      // 1–5, enforced in the service layer
+  rating     Int // 1–5, enforced in the service layer
   comment    String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -466,15 +464,15 @@ enum AdminActionType {
 }
 
 model AdminActionLog {
-  id         String           @id @default(cuid())
+  id         String          @id @default(cuid())
   adminId    String
-  admin      User             @relation(fields: [adminId], references: [id])
+  admin      User            @relation(fields: [adminId], references: [id])
   action     AdminActionType
-  targetType String?          // "Order", "Delivery", "Vendor", "User", "Product"
+  targetType String? // "Order", "Delivery", "Vendor", "User", "Product"
   targetId   String?
-  summary    String           // human-readable one-liner shown in the feed
-  metadata   Json?            // before/after values, riderId, etc.
-  createdAt  DateTime         @default(now())
+  summary    String // human-readable one-liner shown in the feed
+  metadata   Json? // before/after values, riderId, etc.
+  createdAt  DateTime        @default(now())
 
   @@index([adminId])
   @@index([targetType, targetId])
@@ -492,36 +490,35 @@ enum ManualJobStatus {
 }
 
 model ManualJob {
-  id                    String          @id @default(cuid())
-  createdById           String
-  createdBy             User            @relation(fields: [createdById], references: [id])
-  assignedRiderId       String?
-  rider                 Rider?          @relation(fields: [assignedRiderId], references: [id])
+  id              String  @id @default(cuid())
+  createdById     String
+  createdBy       User    @relation(fields: [createdById], references: [id])
+  assignedRiderId String?
+  rider           Rider?  @relation(fields: [assignedRiderId], references: [id])
 
-  customerName          String?
-  customerPhone         String?
+  customerName  String?
+  customerPhone String?
 
-  pickupAddress         String
-  pickupLatitude        Float?
-  pickupLongitude       Float?
+  pickupAddress   String
+  pickupLatitude  Float?
+  pickupLongitude Float?
 
-  destinationAddress    String
-  destinationLatitude   Float?
-  destinationLongitude  Float?
+  destinationAddress   String
+  destinationLatitude  Float?
+  destinationLongitude Float?
 
-  itemDescription       String?
-  amount                Float           @default(0)
-  paymentMethod         PaymentMethod   @default(CASH)
+  itemDescription String?
+  amount          Float         @default(0)
+  paymentMethod   PaymentMethod @default(CASH)
 
-  status                ManualJobStatus @default(PENDING)
-  rawNote                String?        // the pasted blob, kept for audit/reference
+  status  ManualJobStatus @default(PENDING)
+  rawNote String? // the pasted blob, kept for audit/reference
 
-  createdAt             DateTime        @default(now())
-  updatedAt             DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([status])
 }
-
 
 enum ListingStatus {
   DRAFT
@@ -572,13 +569,13 @@ enum EnquiryStatus {
   CLOSED
 }
 
-enum BookingStatus { 
-  PENDING 
-  CONFIRMED 
-  CHECKED_IN 
-  COMPLETED 
-  CANCELLED 
-  REJECTED 
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CHECKED_IN
+  COMPLETED
+  CANCELLED
+  REJECTED
 }
 
 model ProfessionalReview {
@@ -587,7 +584,7 @@ model ProfessionalReview {
   professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
   customerId     String
   customer       User         @relation(fields: [customerId], references: [id])
-  rating         Int          // 1-5, enforced in the service layer
+  rating         Int // 1-5, enforced in the service layer
   comment        String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -607,7 +604,7 @@ model ProfessionalCall {
 }
 
 model Hotel {
-  id          String         @id @default(cuid())
+  id          String        @id @default(cuid())
   name        String
   description String?
   address     String
@@ -615,54 +612,54 @@ model Hotel {
   latitude    Float?
   longitude   Float?
   phone       String
-  images      String[]       @default([])
-  amenities   String[]       @default([])
-  rating      Float          @default(0)
-  status      ListingStatus  @default(DRAFT)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  images      String[]      @default([])
+  amenities   String[]      @default([])
+  rating      Float         @default(0)
+  status      ListingStatus @default(DRAFT)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
-  roomTypes   RoomType[]
-  bookings    HotelBooking[]
+  roomTypes RoomType[]
+  bookings  HotelBooking[]
 
   @@index([status])
 }
 
 model RoomType {
-  id            String         @id @default(cuid())
+  id            String   @id @default(cuid())
   hotelId       String
-  hotel         Hotel          @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  name          String         // "Standard", "Executive", "Self-contained"
+  hotel         Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  name          String // "Standard", "Executive", "Self-contained"
   description   String?
   pricePerNight Float
-  capacity      Int            @default(2)
-  totalRooms    Int            @default(1)   // how many of this type exist
-  images        String[]       @default([])
-  amenities     String[]       @default([])
-  available     Boolean        @default(true)
+  capacity      Int      @default(2)
+  totalRooms    Int      @default(1) // how many of this type exist
+  images        String[] @default([])
+  amenities     String[] @default([])
+  available     Boolean  @default(true)
 
-  bookings      HotelBooking[]
+  bookings HotelBooking[]
 }
 
 model HotelBooking {
-  id            String        @id @default(cuid())
-  customerId    String
-  customer      User          @relation(fields: [customerId], references: [id])
-  hotelId       String
-  hotel         Hotel         @relation(fields: [hotelId], references: [id])
-  roomTypeId    String
-  roomType      RoomType      @relation(fields: [roomTypeId], references: [id])
+  id         String   @id @default(cuid())
+  customerId String
+  customer   User     @relation(fields: [customerId], references: [id])
+  hotelId    String
+  hotel      Hotel    @relation(fields: [hotelId], references: [id])
+  roomTypeId String
+  roomType   RoomType @relation(fields: [roomTypeId], references: [id])
 
-  checkIn       DateTime
-  checkOut      DateTime
-  guests        Int           @default(1)
-  rooms         Int           @default(1)
-  nights        Int
-  totalAmount   Float         // pricePerNight * nights * rooms, frozen at booking time
+  checkIn     DateTime
+  checkOut    DateTime
+  guests      Int      @default(1)
+  rooms       Int      @default(1)
+  nights      Int
+  totalAmount Float // pricePerNight * nights * rooms, frozen at booking time
 
-  guestName     String
-  guestPhone    String
-  notes         String?
+  guestName  String
+  guestPhone String
+  notes      String?
 
   paymentMethod PaymentMethod @default(CASH)
   paymentStatus PaymentStatus @default(PENDING)
@@ -675,69 +672,69 @@ model HotelBooking {
 }
 
 model Trade {
-  id            String         @id @default(cuid())
-  name          String         @unique   // "Electrician"
-  icon          String?                  // emoji or icon key
-  active        Boolean        @default(true)
-  sortOrder     Int            @default(0)
+  id        String  @id @default(cuid())
+  name      String  @unique // "Electrician"
+  icon      String? // emoji or icon key
+  active    Boolean @default(true)
+  sortOrder Int     @default(0)
 
   professionals Professional[]
   jobs          ServiceJob[]
 }
 
 model Professional {
-  id           String        @id @default(cuid())
+  id           String            @id @default(cuid())
   name         String
   phone        String
   photo        String?
   bio          String?
   area         String?
+  whatsapp     String?
   yearsExp     Int?
-  priceNote   String?
-  rating       Float         @default(0)
-  reviewCount Int                  @default(0)
-  totalJobs    Int           @default(0)
-  verified     Boolean       @default(false)
+  priceNote    String?
+  rating       Float             @default(0)
+  reviewCount  Int               @default(0)
+  totalJobs    Int               @default(0)
+  verified     Boolean           @default(false)
   availability RiderAvailability @default(OFFLINE) // reuse ONLINE/BUSY/OFFLINE
-  status       ListingStatus @default(DRAFT)
-  createdAt    DateTime      @default(now())
+  status       ListingStatus     @default(DRAFT)
+  createdAt    DateTime          @default(now())
 
-  trades       Trade[]
-  reviews     ProfessionalReview[]
-  calls       ProfessionalCall[]
-  jobs         ServiceJob[]
+  trades  Trade[]
+  reviews ProfessionalReview[]
+  calls   ProfessionalCall[]
+  jobs    ServiceJob[]
 
   @@index([status])
 }
 
 model ServiceJob {
-  id             String           @id @default(cuid())
+  id             String        @id @default(cuid())
   customerId     String
-  customer       User             @relation(fields: [customerId], references: [id])
+  customer       User          @relation(fields: [customerId], references: [id])
   tradeId        String
-  trade          Trade            @relation(fields: [tradeId], references: [id])
+  trade          Trade         @relation(fields: [tradeId], references: [id])
   professionalId String?
-  professional   Professional?    @relation(fields: [professionalId], references: [id])
+  professional   Professional? @relation(fields: [professionalId], references: [id])
 
-  description    String
-  address        String
-  latitude       Float?
-  longitude      Float?
-  isUrgent       Boolean          @default(false)
-  preferredTime  DateTime?
-  imageUrls      String[]         @default([])
+  description   String
+  address       String
+  latitude      Float?
+  longitude     Float?
+  isUrgent      Boolean   @default(false)
+  preferredTime DateTime?
+  imageUrls     String[]  @default([])
 
-  quotedAmount   Float?           // pro/admin quotes after seeing the description
-  finalAmount    Float?
-  paymentMethod  PaymentMethod    @default(CASH)
-  status         ServiceJobStatus @default(PENDING)
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  quotedAmount  Float? // pro/admin quotes after seeing the description
+  finalAmount   Float?
+  paymentMethod PaymentMethod    @default(CASH)
+  status        ServiceJobStatus @default(PENDING)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
 
   @@index([status])
   @@index([customerId])
 }
-
 
 model Driver {
   id                 String            @id @default(cuid())
@@ -745,7 +742,7 @@ model Driver {
   phone              String
   photo              String?
   vehicleType        RideVehicleType
-  vehicleDescription String?           // "Red Aboboyaa, 3-seater"
+  vehicleDescription String? // "Red Aboboyaa, 3-seater"
   plateNumber        String?
   rating             Float             @default(0)
   totalRides         Int               @default(0)
@@ -756,7 +753,7 @@ model Driver {
   status             ListingStatus     @default(DRAFT)
   createdAt          DateTime          @default(now())
 
-  rides              RideRequest[]
+  rides RideRequest[]
 }
 
 // Admin-editable fares per vehicle type — no redeploy to change prices.
@@ -769,11 +766,11 @@ model RideRate {
 }
 
 model RideRequest {
-  id                   String          @id @default(cuid())
-  customerId           String
-  customer             User            @relation(fields: [customerId], references: [id])
-  driverId             String?
-  driver               Driver?         @relation(fields: [driverId], references: [id])
+  id         String  @id @default(cuid())
+  customerId String
+  customer   User    @relation(fields: [customerId], references: [id])
+  driverId   String?
+  driver     Driver? @relation(fields: [driverId], references: [id])
 
   vehicleType          RideVehicleType
   passengers           Int             @default(1)
@@ -783,58 +780,58 @@ model RideRequest {
   destinationAddress   String
   destinationLatitude  Float?
   destinationLongitude Float?
-  notes                String?         // e.g. "I have luggage", "need a truck for 20 bags of cement"
+  notes                String? // e.g. "I have luggage", "need a truck for 20 bags of cement"
 
-  estimatedFare        Float
-  finalFare            Float?
-  paymentMethod        PaymentMethod   @default(CASH)
-  status               RideStatus      @default(PENDING)
-  createdAt            DateTime        @default(now())
-  updatedAt            DateTime        @updatedAt
+  estimatedFare Float
+  finalFare     Float?
+  paymentMethod PaymentMethod @default(CASH)
+  status        RideStatus    @default(PENDING)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   @@index([status])
   @@index([customerId])
 }
 
 model Property {
-  id             String            @id @default(cuid())
-  title          String
-  description    String?
-  type           PropertyType
-  rentAmount     Float                         // per month, GHS
-  advanceMonths  Int               @default(12) // how many months landlord asks upfront
-  bedrooms       Int?
-  bathrooms      Int?
-  address        String
-  area           String?
-  latitude       Float?
-  longitude      Float?
-  images         String[]          @default([])
-  amenities      String[]          @default([])  // "Water", "Prepaid meter", "Fenced", "Tiled"
+  id            String       @id @default(cuid())
+  title         String
+  description   String?
+  type          PropertyType
+  rentAmount    Float // per month, GHS
+  advanceMonths Int          @default(12) // how many months landlord asks upfront
+  bedrooms      Int?
+  bathrooms     Int?
+  address       String
+  area          String?
+  latitude      Float?
+  longitude     Float?
+  images        String[]     @default([])
+  amenities     String[]     @default([]) // "Water", "Prepaid meter", "Fenced", "Tiled"
 
   // Landlord contact is held server-side and only released after an enquiry
-  contactName    String
-  contactPhone   String
+  contactName  String
+  contactPhone String
 
-  status         ListingStatus     @default(DRAFT)
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  status    ListingStatus @default(DRAFT)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 
-  enquiries      PropertyEnquiry[]
+  enquiries PropertyEnquiry[]
 
   @@index([status, type])
 }
 
 model PropertyEnquiry {
-  id                String        @id @default(cuid())
-  propertyId        String
-  property          Property      @relation(fields: [propertyId], references: [id])
-  customerId        String
-  customer          User          @relation(fields: [customerId], references: [id])
-  message           String?
-  preferredViewing  DateTime?
-  status            EnquiryStatus @default(NEW)
-  createdAt         DateTime      @default(now())
+  id               String        @id @default(cuid())
+  propertyId       String
+  property         Property      @relation(fields: [propertyId], references: [id])
+  customerId       String
+  customer         User          @relation(fields: [customerId], references: [id])
+  message          String?
+  preferredViewing DateTime?
+  status           EnquiryStatus @default(NEW)
+  createdAt        DateTime      @default(now())
 
-  @@unique([propertyId, customerId])   // one live enquiry per person per listing
+  @@unique([propertyId, customerId]) // one live enquiry per person per listing
 }
