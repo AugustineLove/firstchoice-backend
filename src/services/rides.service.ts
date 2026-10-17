@@ -27,9 +27,6 @@ const TRANSITIONS: Record<RideStatus, RideStatus[]> = {
   CANCELLED:   [],
 };
 
-const isVehicleType = (v: unknown): v is RideVehicleType =>
-  typeof v === 'string' && (VEHICLE_TYPES as string[]).includes(v);
-
 const num = (v: unknown): number | null => {
   if (v === null || v === undefined || v === '') return null;
   const n = Number(v);
@@ -87,14 +84,6 @@ function pushRide(ride: { id: string; customerId: string }, event: string, extra
   notifyAdmins('admin:ride_update', { rideId: ride.id, event });
 }
 
-// Customers only ever see the driver's public details, and only after assignment.
-const driverPublic = {
-  select: {
-    name: true, phone: true, photo: true, vehicleType: true,
-    vehicleDescription: true, plateNumber: true, rating: true,
-  },
-};
-
 const adminInclude = {
   customer: { select: { id: true, name: true, phone: true } },
   driver: { select: { id: true, name: true, phone: true, photo: true, vehicleType: true, vehicleDescription: true, plateNumber: true } },
@@ -130,81 +119,81 @@ export async function estimateRide(data: Record<string, any>) {
   return { vehicleType: data.vehicleType, ...computeFare(rate, distanceFrom(data)) };
 }
 
-export async function requestRide(customerId: string, data: Record<string, any>) {
-  if (!isVehicleType(data.vehicleType)) throw new Error('Choose a valid vehicle type');
+// export async function requestRide(customerId: string, data: Record<string, any>) {
+//   if (!isVehicleType(data.vehicleType)) throw new Error('Choose a valid vehicle type');
 
-  const passengers = Number(data.passengers ?? 1);
-  if (!Number.isInteger(passengers) || passengers < 1 || passengers > 30) throw new Error('Passengers must be between 1 and 30');
+//   const passengers = Number(data.passengers ?? 1);
+//   if (!Number.isInteger(passengers) || passengers < 1 || passengers > 30) throw new Error('Passengers must be between 1 and 30');
 
-  const pickupAddress = String(data.pickupAddress || '').trim();
-  const destinationAddress = String(data.destinationAddress || '').trim();
-  if (!pickupAddress || !destinationAddress) throw new Error('Pickup and destination are required');
+//   const pickupAddress = String(data.pickupAddress || '').trim();
+//   const destinationAddress = String(data.destinationAddress || '').trim();
+//   if (!pickupAddress || !destinationAddress) throw new Error('Pickup and destination are required');
 
-  const open = await prisma.rideRequest.count({ where: { customerId, status: { in: ACTIVE_STATUSES } } });
-  if (open >= MAX_OPEN_RIDES_PER_CUSTOMER) throw new Error('You already have active ride requests. Finish or cancel one first.');
+//   const open = await prisma.rideRequest.count({ where: { customerId, status: { in: ACTIVE_STATUSES } } });
+//   if (open >= MAX_OPEN_RIDES_PER_CUSTOMER) throw new Error('You already have active ride requests. Finish or cancel one first.');
 
-  const rate = await getRate(data.vehicleType);
-  if (!rate.active) throw new Error('This vehicle type is not available right now');
+//   const rate = await getRate(data.vehicleType);
+//   if (!rate.active) throw new Error('This vehicle type is not available right now');
 
-  // Fare is always computed on the server. The client's number is never trusted.
-  const { fare } = computeFare(rate, distanceFrom(data));
+//   // Fare is always computed on the server. The client's number is never trusted.
+//   const { fare } = computeFare(rate, distanceFrom(data));
 
-  const ride = await prisma.rideRequest.create({
-    data: {
-      customerId,
-      vehicleType: data.vehicleType,
-      passengers,
-      pickupAddress,
-      pickupLatitude: num(data.pickupLatitude),
-      pickupLongitude: num(data.pickupLongitude),
-      destinationAddress,
-      destinationLatitude: num(data.destinationLatitude),
-      destinationLongitude: num(data.destinationLongitude),
-      notes: String(data.notes || '').trim().slice(0, 500) || null,
-      estimatedFare: fare,
-      paymentMethod: data.paymentMethod === 'MOMO' ? 'MOMO' : 'CASH',
-    },
-    include: { driver: driverPublic, customer: { select: { name: true, phone: true } } },
-  });
+//   const ride = await prisma.rideRequest.create({
+//     data: {
+//       customerId,
+//       vehicleType: data.vehicleType,
+//       passengers,
+//       pickupAddress,
+//       pickupLatitude: num(data.pickupLatitude),
+//       pickupLongitude: num(data.pickupLongitude),
+//       destinationAddress,
+//       destinationLatitude: num(data.destinationLatitude),
+//       destinationLongitude: num(data.destinationLongitude),
+//       notes: String(data.notes || '').trim().slice(0, 500) || null,
+//       estimatedFare: fare,
+//       paymentMethod: data.paymentMethod === 'MOMO' ? 'MOMO' : 'CASH',
+//     },
+//     include: { driver: driverPublic, customer: { select: { name: true, phone: true } } },
+//   });
 
-  notifyAdmins('admin:ride_requested', { rideId: ride.id, vehicleType: ride.vehicleType, timestamp: new Date() });
-  safe(() => sendCustomerMessage({
-    messageTo: LOGISTICS_MANAGER_NUMBERS,
-    messageFrom: 'FirstChoice',
-    message: `New ride request (${ride.vehicleType}) from ${ride.customer.name}: ${ride.pickupAddress} → ${ride.destinationAddress}.\nPassengers: ${ride.passengers}. Est. fare: GHS ${ride.estimatedFare}.\nCustomer phone: ${ride.customer.phone}`,
-  }));
+//   notifyAdmins('admin:ride_requested', { rideId: ride.id, vehicleType: ride.vehicleType, timestamp: new Date() });
+//   safe(() => sendCustomerMessage({
+//     messageTo: LOGISTICS_MANAGER_NUMBERS,
+//     messageFrom: 'FirstChoice',
+//     message: `New ride request (${ride.vehicleType}) from ${ride.customer.name}: ${ride.pickupAddress} → ${ride.destinationAddress}.\nPassengers: ${ride.passengers}. Est. fare: GHS ${ride.estimatedFare}.\nCustomer phone: ${ride.customer.phone}`,
+//   }));
 
-  return ride;
-}
+//   return ride;
+// }
 
-export async function getMyRides(customerId: string) {
-  return prisma.rideRequest.findMany({
-    where: { customerId },
-    orderBy: { createdAt: 'desc' },
-    take: 30,
-    include: { driver: driverPublic },
-  });
-}
+// export async function getMyRides(customerId: string) {
+//   return prisma.rideRequest.findMany({
+//     where: { customerId },
+//     orderBy: { createdAt: 'desc' },
+//     take: 30,
+//     include: { driver: driverPublic },
+//   });
+// }
 
-export async function getRide(id: string, customerId: string) {
-  const ride = await prisma.rideRequest.findFirst({ where: { id, customerId }, include: { driver: driverPublic } });
-  if (!ride) throw new Error('Ride not found');
-  return ride;
-}
+// export async function getRide(id: string, customerId: string) {
+//   const ride = await prisma.rideRequest.findFirst({ where: { id, customerId }, include: { driver: driverPublic } });
+//   if (!ride) throw new Error('Ride not found');
+//   return ride;
+// }
 
-export async function cancelRide(id: string, customerId: string) {
-  const ride = await prisma.rideRequest.findFirst({ where: { id, customerId } });
-  if (!ride) throw new Error('Ride not found');
-  if (!['PENDING', 'ACCEPTED'].includes(ride.status)) throw new Error('This ride can no longer be cancelled');
+// export async function cancelRide(id: string, customerId: string) {
+//   const ride = await prisma.rideRequest.findFirst({ where: { id, customerId } });
+//   if (!ride) throw new Error('Ride not found');
+//   if (!['PENDING', 'ACCEPTED'].includes(ride.status)) throw new Error('This ride can no longer be cancelled');
 
-  await prisma.$transaction(async (tx) => {
-    await tx.rideRequest.update({ where: { id }, data: { status: 'CANCELLED' } });
-    if (ride.driverId) await tx.driver.update({ where: { id: ride.driverId }, data: { availability: 'ONLINE' } });
-  });
+//   await prisma.$transaction(async (tx) => {
+//     await tx.rideRequest.update({ where: { id }, data: { status: 'CANCELLED' } });
+//     if (ride.driverId) await tx.driver.update({ where: { id: ride.driverId }, data: { availability: 'ONLINE' } });
+//   });
 
-  notifyAdmins('admin:ride_update', { rideId: id, event: 'ride:cancelled_by_customer' });
-  return getRide(id, customerId);
-}
+//   notifyAdmins('admin:ride_update', { rideId: id, event: 'ride:cancelled_by_customer' });
+//   return getRide(id, customerId);
+// }
 
 /* ═══════════════════════ ADMIN: RIDES ═══════════════════════ */
 
@@ -296,35 +285,6 @@ export async function adminUpdateRideStatus(rideId: string, newStatus: string, o
 
 /* ═══════════════════════ ADMIN: DRIVERS ═══════════════════════ */
 
-export async function adminListDrivers(f: { status?: string; vehicleType?: string }) {
-  return prisma.driver.findMany({
-    where: {
-      ...(f.status && { status: f.status as any }),
-      ...(f.vehicleType && isVehicleType(f.vehicleType) && { vehicleType: f.vehicleType }),
-    },
-    include: { _count: { select: { rides: true } } },
-    orderBy: { createdAt: 'desc' },
-  });
-}
-
-export async function adminCreateDriver(data: Record<string, any>) {
-  if (!data.name?.trim() || !data.phone?.trim()) throw new Error('Name and phone are required');
-  if (!isVehicleType(data.vehicleType)) throw new Error('Choose a vehicle type');
-  return prisma.driver.create({
-    data: {
-      name: data.name.trim(),
-      phone: data.phone.trim(),
-      photo: data.photo || null,
-      vehicleType: data.vehicleType,
-      vehicleDescription: data.vehicleDescription?.trim() || null,
-      plateNumber: data.plateNumber?.trim() || null,
-      verified: !!data.verified,
-      status: data.status ?? 'ACTIVE',
-      availability: data.availability ?? 'OFFLINE',
-    },
-  });
-}
-
 export async function adminUpdateDriver(id: string, data: Record<string, any>) {
   const allowed = ['name', 'phone', 'photo', 'vehicleType', 'vehicleDescription', 'plateNumber', 'verified', 'status', 'availability'];
   const payload: Record<string, any> = {};
@@ -357,6 +317,100 @@ export async function adminUpsertRate(vehicleType: string, data: Record<string, 
     update: payload,
   });
 }
+
+const isVehicleType = (v: unknown): v is RideVehicleType =>
+  typeof v === 'string' && (VEHICLE_TYPES as string[]).includes(v);
+ 
+// Only what the customer needs to call a driver.
+const driverPublic = {
+  id: true, name: true, phone: true, whatsapp: true, photo: true,
+  vehicleType: true, vehicleDescription: true, plateNumber: true,
+  area: true, rating: true, totalRides: true, verified: true, availability: true,
+} as const;
+ 
+/* ═══════════════ CUSTOMER ═══════════════ */
+ 
+/** Vehicle types for the picker, with how many drivers are listed / online. */
+export async function listVehicleTypes() {
+  const rows = await prisma.driver.groupBy({
+    by: ['vehicleType', 'availability'],
+    where: { status: 'ACTIVE' },
+    _count: { id: true },
+  });
+ 
+  const total: Record<string, number> = {};
+  const online: Record<string, number> = {};
+  for (const r of rows) {
+    total[r.vehicleType] = (total[r.vehicleType] || 0) + r._count.id;
+    if (r.availability === 'ONLINE') online[r.vehicleType] = r._count.id;
+  }
+ 
+  return VEHICLE_TYPES
+    .filter((t) => t !== 'OTHER' || total[t] > 0)
+    .map((t) => ({ vehicleType: t, driverCount: total[t] || 0, driversOnline: online[t] || 0 }));
+}
+ 
+export async function listDrivers(f: { vehicleType?: string; sort?: string; search?: string; limit?: number }) {
+  if (!isVehicleType(f.vehicleType)) throw new Error('Choose a valid vehicle type');
+  const search = f.search?.trim();
+ 
+  const drivers = await prisma.driver.findMany({
+    where: {
+      status: 'ACTIVE',
+      vehicleType: f.vehicleType,
+      ...(search && {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' as const } },
+          { area: { contains: search, mode: 'insensitive' as const } },
+        ],
+      }),
+    },
+    select: driverPublic,
+    take: Math.min(f.limit || 50, 100),
+  });
+ 
+  const secondary = f.sort === 'rides'
+    ? (a: typeof drivers[number], b: typeof drivers[number]) => b.totalRides - a.totalRides
+    : (a: typeof drivers[number], b: typeof drivers[number]) => b.rating - a.rating;
+ 
+  // Online drivers first, then by the chosen sort.
+  const rank = (d: { availability: string }) => (d.availability === 'ONLINE' ? 0 : d.availability === 'BUSY' ? 1 : 2);
+  return drivers.sort((a, b) => rank(a) - rank(b) || secondary(a, b));
+}
+ 
+/* ═══════════════ ADMIN: DRIVERS ═══════════════ */
+ 
+export async function adminListDrivers(f: { status?: string; vehicleType?: string }) {
+  return prisma.driver.findMany({
+    where: {
+      ...(f.status && { status: f.status as any }),
+      ...(f.vehicleType && isVehicleType(f.vehicleType) && { vehicleType: f.vehicleType }),
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+ 
+export async function adminCreateDriver(data: Record<string, any>) {
+  if (!data.name?.trim() || !data.phone?.trim()) throw new Error('Name and phone are required');
+  if (!isVehicleType(data.vehicleType)) throw new Error('Choose a vehicle type');
+  return prisma.driver.create({
+    data: {
+      name: data.name.trim(),
+      phone: data.phone.trim(),
+      whatsapp: data.whatsapp?.trim() || null,
+      photo: data.photo || null,
+      vehicleType: data.vehicleType,
+      vehicleDescription: data.vehicleDescription?.trim() || null,
+      plateNumber: data.plateNumber?.trim() || null,
+      area: data.area?.trim() || null,
+      rating: Number(data.rating) || 0,
+      verified: !!data.verified,
+      status: data.status ?? 'ACTIVE',
+      availability: data.availability ?? 'OFFLINE',
+    },
+  });
+}
+
 
 /* ═══════════════════════ CONTROLLER HELPER ═══════════════════════ */
 
