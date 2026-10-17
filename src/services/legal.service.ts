@@ -165,8 +165,8 @@ export function registerLegalRoutes(router: Router, authenticate: any) {
 }
 
 /** Mount on the admin router (already behind authenticate + authorize('ADMIN')). */
-export function registerLegalAdminRoutes(adminRouter: Router) {
-  adminRouter.put('/terms', h((req) => adminSetTerms(req.body)));
-  adminRouter.delete('/terms', h(() => adminClearTerms()));
-  adminRouter.get('/terms/stats', h(() => adminTermsStats()));
-}
+// export function registerLegalAdminRoutes(adminRouter: Router) {
+//   adminRouter.put('/terms', h((req) => adminSetTerms(req.body)));
+//   adminRouter.delete('/terms', h(() => adminClearTerms()));
+//   adminRouter.get('/terms/stats', h(() => adminTermsStats()));
+// }

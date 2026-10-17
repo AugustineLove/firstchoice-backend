@@ -8,7 +8,7 @@ import { parseOffBookText } from '../services/manualjob.service';
 import { updateServiceFlags } from '../services/service-flags.service';
 import { registerProsAdminRoutes } from '../services/pros.service';
 import { registerRidesAdminRoutes } from '../services/rides.service';
-import { registerLegalAdminRoutes } from '../services/legal.service';
+import { registerLegalAdminRoutes } from '../services/legal.admin.service';
 
 const adminRouter = Router();
 

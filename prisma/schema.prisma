@@ -867,3 +867,14 @@ model TermsAcceptance {
   @@unique([userId, version])
   @@index([version])
 }
+
+model TermsVersion {
+  id             String    @id @default(cuid())
+  version        String    @unique
+  summary        String?
+  termsContent   String    @db.Text
+  privacyContent String    @db.Text
+  publishedAt    DateTime? // null = draft
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
