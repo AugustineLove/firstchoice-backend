@@ -69,14 +69,6 @@ async function sendToUser(userId: string, payload: PushPayload) {
     })
     .catch((e) => console.error('[notif] save failed', e));
 
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { fcmToken: true, webFcmToken: true },
-  });
-
-  const tokens = [user?.fcmToken, user?.webFcmToken].filter(Boolean).map(cleanString);
-  if (!tokens.length) return false;
-
   const results = await Promise.allSettled(tokens.map((token) =>
     app.messaging().send({
       token,
