@@ -136,6 +136,11 @@ model User {
 
   proReviews ProfessionalReview[]
   proCalls   ProfessionalCall[]
+
+  termsVersion    String?
+  termsAcceptedAt DateTime?
+  termsAcceptances TermsAcceptance[]
+
 }
 
 model Rider {
@@ -408,6 +413,12 @@ model Settings {
 
   updatedAt       DateTime @updatedAt
   enabledServices Json?
+  
+  termsVersion String?   
+  termsUrl     String?
+  privacyUrl   String?
+  termsSummary String?   
+
 }
 
 model Errand {
@@ -839,4 +850,20 @@ model PropertyEnquiry {
   createdAt        DateTime      @default(now())
 
   @@unique([propertyId, customerId]) // one live enquiry per person per listing
+}
+
+
+model TermsAcceptance {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  version     String            // e.g. "2026-11-01"
+  documents   String[]          // ["terms", "privacy"]
+  appVersion  String?
+  platform    String?           // android / ios / web
+  ipAddress   String?
+  acceptedAt  DateTime @default(now())
+
+  @@unique([userId, version])
+  @@index([version])
 }

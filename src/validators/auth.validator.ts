@@ -10,7 +10,7 @@ export function validateRegister(data: any): string | null {
   if (!password || typeof password !== 'string' || password.length < 6)
     return 'Password must be at least 6 characters';
 
-  const allowedRoles = ['CUSTOMER', 'RIDER', 'VENDOR', 'ADMIN'];
+  const allowedRoles = ['CUSTOMER', 'RIDER', 'VENDOR'];
   if (role && !allowedRoles.includes(role))
     return 'Role must be CUSTOMER, RIDER, or VENDOR';
 

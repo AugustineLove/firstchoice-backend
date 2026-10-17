@@ -4,9 +4,9 @@ import { validateRegister, validateLogin, validateForgotPassword, validateResetP
 import { User } from '@prisma/client';
 import { AuthRequest } from '../interface/auth-request.interface.ts';
 import { prisma } from '../config/prisma';
+import { termsRequiredFor } from '../services/legal.service';
 
 export async function register(req: Request, res: Response) {
-  console.log(req.body)
   const error = validateRegister(req.body);
   if (error) {
     res.status(400).json({ success: false, message: error });
@@ -14,7 +14,7 @@ export async function register(req: Request, res: Response) {
   }
 
   try {
-    const result = await AuthService.registerUser(req.body);
+    const result = await AuthService.registerUser(req.body, req.ip);
     res.status(201).json({ success: true, data: result });
   } catch (err: any) {
     res.status(400).json({ success: false, message: err.message });
@@ -22,7 +22,6 @@ export async function register(req: Request, res: Response) {
 }
 
 export async function login(req: Request, res: Response) {
-  console.log(req.body);
   const error = validateLogin(req.body);
   if (error) {
     res.status(400).json({ success: false, message: error });
@@ -52,11 +51,17 @@ export async function refresh(req: Request, res: Response) {
   }
 }
 
+async function safeTermsRequired(user: any) {
+  try { return await termsRequiredFor(user); } catch { return false; }
+}
+
+
 export async function me(req: AuthRequest, res: Response) {
   try {
     const rawUser = await prisma.user.findUnique({
       where: { id: req.user!.id },
-      select: { id:true, name:true, phone:true, email:true, role:true, status:true, profileImage:true },
+      select: { id:true, name:true, phone:true, email:true, role:true, status:true,
+            profileImage:true, termsVersion:true },
     });
     if (!rawUser) { res.status(404).json({ success:false, message:'User not found' }); return; }
 
@@ -65,12 +70,14 @@ export async function me(req: AuthRequest, res: Response) {
       select: { id: true },
     });
 
+    const { termsVersion, ...publicUser } = rawUser;
     res.status(200).json({
       success: true,
       data: {
         user: {
-          ...rawUser,
-          hasVendorProfile: vendor !== null,  // ← actual DB check
+           ...publicUser,
+          hasVendorProfile: vendor !== null,
+      requiresTerms: rawUser.role === 'CUSTOMER' && (await safeTermsRequired(rawUser)),
         },
       },
     });
@@ -83,7 +90,6 @@ export async function resetPassword(req: Request, res: Response) {
   // const error = validateResetPassword(req.body.phone);
   // console.log(`Error: ${error}`)
   // if (error) { res.status(400).json({ success: false, message: error }); return; }
-  console.log('Reset password request received:', req.body);
   try {
     await AuthService.resetPassword(req.body.token, req.body.password);
     res.status(200).json({ success: true, message: 'Password reset successfully' });
@@ -96,7 +102,6 @@ export async function resetPassword(req: Request, res: Response) {
 export async function resetPasswordEmail(req: Request, res: Response) {
   const error = validateResetPassword(req.body);
 
-  console.log(`Error: ${error}`);
 
   if (error) {
     res.status(400).json({

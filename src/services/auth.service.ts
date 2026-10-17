@@ -8,10 +8,17 @@ dotenv.config();
 import { getAuth } from 'firebase-admin/auth';
 import crypto from 'crypto';
 import firebase from 'firebase/compat/app';
+import { termsRequiredFor } from './legal.service';
+import { getSettings } from './setting.service';
 
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET!;
+
+async function safeTermsRequired(user: any) {
+  try { return await termsRequiredFor(user); } catch { return false; }
+}
+
 
 async function buildUserResponse(user: any) {
   const vendorProfile = await prisma.vendor.findUnique({
@@ -28,6 +35,7 @@ async function buildUserResponse(user: any) {
     status:           user.status,
     profileImage:     user.profileImage,
     hasVendorProfile: vendorProfile !== null,  // ← actual DB check
+    requiresTerms: user.role === 'CUSTOMER' && (await safeTermsRequired(user)),
   };
 }
 
@@ -44,22 +52,25 @@ function generateTokens(userId: string, role: Role) {
   return { accessToken, refreshToken };
 }
 
+
 export async function registerUser(data: {
-  name: string;
-  phone: string;
-  email?: string;
-  password: string;
-  role?: Role;
-}) {
+  name: string; phone: string; email?: string; password: string; role?: Role;
+    acceptedTermsVersion?: string; appVersion?: string; platform?: string;
+  },
+  ip?: string,
+) {
   const existing = await prisma.user.findUnique({
     where: { phone: data.phone },
   });
-  console.log(data);
 
   if (existing) throw new Error('Phone number already registered');
 
   const passwordHash = await bcrypt.hash(data.password, 10);
 
+  const settings = await getSettings();
+  const acceptedNow = !!settings.termsVersion && data.acceptedTermsVersion === settings.termsVersion;
+
+  
   const rawUser = await prisma.user.create({
     data: {
       name: data.name.trim(),
@@ -67,6 +78,19 @@ export async function registerUser(data: {
       email: data.email?.trim() || null,
       passwordHash,
       role: data.role || 'CUSTOMER',
+       ...(acceptedNow && {
+        termsVersion: settings.termsVersion,
+        termsAcceptedAt: new Date(),
+        termsAcceptances: {
+          create: {
+            version: settings.termsVersion!,
+            documents: ['terms', 'privacy'],
+            appVersion: data.appVersion ?? null,
+            platform: data.platform ?? null,
+            ipAddress: ip ?? null,
+          },
+        },
+      }),
     },
     select: {
       id: true,
@@ -76,6 +100,7 @@ export async function registerUser(data: {
       role: true,
       status: true,
       createdAt: true,
+      termsVersion: true,
     },
   });
 
@@ -135,7 +160,6 @@ export async function resetPassword(
   newPassword: string
 ) {
 
-  console.log(`User found for token:  ? user.id : 'none'}`);
 
   const user = await prisma.user.findFirst({
     where: {

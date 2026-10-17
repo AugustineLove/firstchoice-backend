@@ -7,7 +7,7 @@ import { getMyServices } from '../services/service-flags.service';
 const settingsRouter = Router();
 
 settingsRouter.get('/errand', getErrandSettings);
-settingsRouter.patch('/closing-status', setClosingStatus);
+settingsRouter.patch('/closing-status', authenticate, authorize('ADMIN'), setClosingStatus);
 settingsRouter.get('/services', authenticate, getMyServices);
 
 

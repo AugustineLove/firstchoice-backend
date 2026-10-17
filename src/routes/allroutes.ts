@@ -14,6 +14,9 @@ import settingsRouter from "./settings.routes";
 import prosRouter from "./pros.routes";
 import { getOperatingStatus } from "../controllers/settings.controller";
 import ridesRouter from "./rides.routes";
+import { authenticate } from "../middleware/auth.middleware";
+import { requireTerms } from "../services/legal.service";
+import legalRouter from "./legal.routes";
 
 const allRoutes = Router();
 
@@ -32,6 +35,7 @@ allRoutes.use('/api/locations', locationRouter);
 allRoutes.use('/api/settings', settingsRouter); 
 allRoutes.get('/api/operating-status', getOperatingStatus);
 allRoutes.use('/api/pros', prosRouter);
-allRoutes.use('/api/rides', ridesRouter);
+allRoutes.use('/api/rides', authenticate, requireTerms, ridesRouter);
+allRoutes.use('/api/legal', legalRouter);
 
 export default allRoutes;
