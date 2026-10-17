@@ -141,6 +141,8 @@ model User {
   termsAcceptedAt DateTime?
   termsAcceptances TermsAcceptance[]
 
+  notifications Notification[]
+
 }
 
 model Rider {
@@ -877,4 +879,19 @@ model TermsVersion {
   publishedAt    DateTime? // null = draft
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String?   // NEW_ORDER, ORDER_STATUS, DELIVERY_STATUS, ...
+  title     String
+  body      String
+  data      Json?     // orderId, deliveryId, screen, ...
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
 }

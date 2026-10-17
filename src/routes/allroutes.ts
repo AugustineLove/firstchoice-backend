@@ -17,6 +17,7 @@ import ridesRouter from "./rides.routes";
 import { authenticate } from "../middleware/auth.middleware";
 import { requireTerms } from "../services/legal.service";
 import legalRouter from "./legal.routes";
+import notificationRouter from "./notification.routes";
 
 const allRoutes = Router();
 
@@ -37,5 +38,6 @@ allRoutes.get('/api/operating-status', getOperatingStatus);
 allRoutes.use('/api/pros', prosRouter);
 allRoutes.use('/api/rides', authenticate, requireTerms, ridesRouter);
 allRoutes.use('/api/legal', legalRouter);
+allRoutes.use('/api/notifications', notificationRouter);
 
 export default allRoutes;

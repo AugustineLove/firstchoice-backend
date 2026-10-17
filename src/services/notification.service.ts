@@ -38,6 +38,7 @@ function cleanString(str: any): string {
 }
 
 async function sendToUser(userId: string, payload: PushPayload) {
+
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { fcmToken: true, webFcmToken: true },
@@ -54,6 +55,27 @@ async function sendToUser(userId: string, payload: PushPayload) {
       safeData[k] = cleanString(v);
     }
   }
+
+
+  prisma.notification
+    .create({
+      data: {
+        userId,
+        type: safeData.type ?? null,
+        title: safeTitle,
+        body: safeBody,
+        data: safeData,
+      },
+    })
+    .catch((e) => console.error('[notif] save failed', e));
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { fcmToken: true, webFcmToken: true },
+  });
+
+  const tokens = [user?.fcmToken, user?.webFcmToken].filter(Boolean).map(cleanString);
+  if (!tokens.length) return false;
 
   const results = await Promise.allSettled(tokens.map((token) =>
     app.messaging().send({
