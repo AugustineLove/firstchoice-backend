@@ -370,6 +370,16 @@ const h =
     }
   };
 
+  export function registerRidesRoutes(router: Router) {
+  router.get('/types', h(() => listVehicleTypes()));
+  router.get('/drivers', h((req) => listDrivers({
+    vehicleType: req.query.vehicleType as string | undefined,
+    sort: req.query.sort as string | undefined,
+    search: req.query.search as string | undefined,
+    limit: req.query.limit ? Number(req.query.limit) : undefined,
+  })));
+}
+
 export function registerRidesAdminRoutes(adminRouter: Router) {
   adminRouter.get('/rides', h((req) => adminListRides({
     status: req.query.status as string | undefined,

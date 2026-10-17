@@ -744,6 +744,9 @@ model Driver {
   phone              String
   photo              String?
   vehicleType        RideVehicleType
+  whatsapp           String?
+  area               String?
+
   vehicleDescription String? // "Red Aboboyaa, 3-seater"
   plateNumber        String?
   rating             Float             @default(0)
