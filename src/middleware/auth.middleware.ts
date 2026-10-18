@@ -9,7 +9,7 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ success: false, message: 'No token provided' });
+    res.status(401).json({ success: false, message: 'No token provided, please sign in' });
     return;
   }
 
@@ -23,7 +23,7 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
     req.user = { id: payload.id, role: payload.role };
     next();
   } catch {
-    res.status(401).json({ success: false, message: 'Invalid or expired token' });
+    res.status(401).json({ success: false, message: 'Invalid or expired token, please sign in again' });
   }
 }
 
@@ -31,12 +31,12 @@ export function authorize(...roles: Role[]) {
   
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
-      res.status(401).json({ success: false, message: 'Not authenticated' });
+      res.status(401).json({ success: false, message: 'Not authenticated, please sign in' });
       return;
     }
     if (!roles.includes(req.user.role)) {
       console.log(req.user.role, roles);
-      res.status(403).json({ success: false, message: 'Access denied' });
+      res.status(403).json({ success: false, message: 'Access denied, please contact an administrator' });
       return;
     }
 
