@@ -13,9 +13,10 @@ import { getSettings, invalidateSettingsCache } from './setting.service';
 const VERSION_RE = /^[A-Za-z0-9._-]{1,40}$/;
 const MIN_CONTENT = 100;
 const MAX_CONTENT = 200_000;
+const WEBSITE_URL = (process.env.PUBLIC_WEBSITE_URL || 'https://firstchoice-ten.vercel.app').replace(/\/$/, '');
 
-const pageUrl = (baseUrl: string, type: 'terms' | 'privacy', version: string) =>
-  `${baseUrl}/api/legal/page/${type}/${encodeURIComponent(version)}`;
+const pageUrl = (_baseUrl: string, type: 'terms' | 'privacy', version: string) =>
+  `${WEBSITE_URL}/${type}?v=${encodeURIComponent(version)}`;
 
 function readFields(data: Record<string, any>, partial: boolean) {
   const out: { version?: string; summary?: string | null; termsContent?: string; privacyContent?: string } = {};
@@ -212,4 +213,29 @@ export function registerLegalPageRoutes(router: Router) {
       res.status(500).send('Something went wrong');
     }
   });
+
+  router.get('/public/:type', async (req, res) => {
+  try {
+    const type = req.params.type;
+    if (type !== 'terms' && type !== 'privacy') return void res.status(404).json({ success: false, message: 'Not found' });
+
+    const v = typeof req.query.v === 'string' ? req.query.v : undefined;
+    const row = v
+      ? await prisma.termsVersion.findUnique({ where: { version: v } })
+      : await prisma.termsVersion.findFirst({ where: { publishedAt: { not: null } }, orderBy: { publishedAt: 'desc' } });
+    if (!row || !row.publishedAt) return void res.status(404).json({ success: false, message: 'Not found' });
+
+    res.set('Cache-Control', 'public, max-age=300').json({
+      success: true,
+      data: {
+        type,
+        version: row.version,
+        effectiveDate: row.publishedAt.toISOString().slice(0, 10),
+        content: type === 'terms' ? row.termsContent : row.privacyContent,
+      },
+    });
+  } catch {
+    res.status(500).json({ success: false, message: 'Something went wrong' });
+  }
+});
 }

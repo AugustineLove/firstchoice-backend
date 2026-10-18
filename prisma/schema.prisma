@@ -770,6 +770,7 @@ model Driver {
   verified           Boolean           @default(false)
   status             ListingStatus     @default(DRAFT)
   createdAt          DateTime          @default(now())
+  subType            String?
 
   rides RideRequest[]
 }

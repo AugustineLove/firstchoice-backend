@@ -286,11 +286,20 @@ export async function adminUpdateRideStatus(rideId: string, newStatus: string, o
 /* ═══════════════════════ ADMIN: DRIVERS ═══════════════════════ */
 
 export async function adminUpdateDriver(id: string, data: Record<string, any>) {
-  const allowed = ['name', 'phone', 'photo', 'vehicleType', 'vehicleDescription', 'plateNumber', 'verified', 'status', 'availability'];
+  const allowed = ['name', 'phone', 'whatsapp', 'photo', 'vehicleType', 'vehicleDescription', 'plateNumber', 'area', 'verified', 'status', 'availability'];
   const payload: Record<string, any> = {};
   for (const k of allowed) if (data[k] !== undefined) payload[k] = data[k];
   if (payload.vehicleType !== undefined && !isVehicleType(payload.vehicleType)) throw new Error('Invalid vehicle type');
   if (payload.availability !== undefined && !['ONLINE', 'OFFLINE', 'BUSY'].includes(payload.availability)) throw new Error('Invalid availability');
+
+  if (data.subType !== undefined || payload.vehicleType !== undefined) {
+    const current = await prisma.driver.findUnique({ where: { id }, select: { vehicleType: true, subType: true } });
+    if (!current) throw new Error('Driver not found');
+    const vehicleType = (payload.vehicleType ?? current.vehicleType) as RideVehicleType;
+    const changedType = payload.vehicleType !== undefined && payload.vehicleType !== current.vehicleType;
+    const kind = data.subType !== undefined ? data.subType : changedType ? null : current.subType;
+    payload.subType = cleanSubType(vehicleType, kind);
+  }
   return prisma.driver.update({ where: { id }, data: payload });
 }
 
@@ -321,10 +330,23 @@ export async function adminUpsertRate(vehicleType: string, data: Record<string, 
 const isVehicleType = (v: unknown): v is RideVehicleType =>
   typeof v === 'string' && (VEHICLE_TYPES as string[]).includes(v);
  
+const SUBTYPES: Partial<Record<RideVehicleType, string[]>> = {
+  TRICYCLE: ['PRAGIA', 'ABOBOYAA'],
+};
+
+
+/** Returns a clean kind, or null. Throws if the kind doesn't belong to the vehicle type. */
+function cleanSubType(vehicleType: RideVehicleType, raw: unknown): string | null {
+  const v = typeof raw === 'string' ? raw.trim().toUpperCase() : '';
+  if (!v) return null;
+  if (!SUBTYPES[vehicleType]?.includes(v)) throw new Error(`Invalid kind for ${vehicleType}`);
+  return v;
+}
+
 // Only what the customer needs to call a driver.
 const driverPublic = {
   id: true, name: true, phone: true, whatsapp: true, photo: true,
-  vehicleType: true, vehicleDescription: true, plateNumber: true,
+  vehicleType: true, subType: true, vehicleDescription: true, plateNumber: true,
   area: true, rating: true, totalRides: true, verified: true, availability: true,
 } as const;
  
@@ -350,14 +372,16 @@ export async function listVehicleTypes() {
     .map((t) => ({ vehicleType: t, driverCount: total[t] || 0, driversOnline: online[t] || 0 }));
 }
  
-export async function listDrivers(f: { vehicleType?: string; sort?: string; search?: string; limit?: number }) {
+export async function listDrivers(f: { vehicleType?: string; subType?: string; sort?: string; search?: string; limit?: number }) {
   if (!isVehicleType(f.vehicleType)) throw new Error('Choose a valid vehicle type');
   const search = f.search?.trim();
- 
+  const subType = cleanSubType(f.vehicleType, f.subType);
+
   const drivers = await prisma.driver.findMany({
     where: {
       status: 'ACTIVE',
       vehicleType: f.vehicleType,
+      ...(subType && { subType }),
       ...(search && {
         OR: [
           { name: { contains: search, mode: 'insensitive' as const } },
@@ -400,6 +424,7 @@ export async function adminCreateDriver(data: Record<string, any>) {
       whatsapp: data.whatsapp?.trim() || null,
       photo: data.photo || null,
       vehicleType: data.vehicleType,
+      subType: cleanSubType(data.vehicleType, data.subType),
       vehicleDescription: data.vehicleDescription?.trim() || null,
       plateNumber: data.plateNumber?.trim() || null,
       area: data.area?.trim() || null,
@@ -427,6 +452,7 @@ const h =
   export function registerRidesRoutes(router: Router) {
   router.get('/types', h(() => listVehicleTypes()));
   router.get('/drivers', h((req) => listDrivers({
+    subType: req.query.subType as string | undefined,
     vehicleType: req.query.vehicleType as string | undefined,
     sort: req.query.sort as string | undefined,
     search: req.query.search as string | undefined,
