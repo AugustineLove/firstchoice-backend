@@ -27,7 +27,7 @@ export async function createAnnouncement(adminId: string, data: {
       subtitle: data.subtitle?.trim() || null,
       imageUrl: data.imageUrl || null,
       targetType: data.targetType,
-      vendorId: data.targetType === 'VENDOR' ? data.vendorId : null,
+      vendorId: data.vendorId,
       productId: data.targetType === 'PRODUCT' ? data.productId : null,
       startsAt: data.startsAt ? new Date(data.startsAt) : new Date(),
       endsAt: data.endsAt ? new Date(data.endsAt) : null,

@@ -18,8 +18,10 @@ export async function createProduct(req: AuthRequest, res: Response) {
 
 export async function updateProduct(req: AuthRequest, res: Response) {
   try {
+    const userId = (req.query.userId as string) || req.user!.id;
+    console.log("UPDATE PRODUCT REQUEST:", { userId, productId: req.params.id, body: req.body });
     const product = await ProductService.updateProduct(
-      req.user!.id,
+      userId,
       req.params.id as string,
       req.body
     );
