@@ -38,6 +38,7 @@ export async function updateVendorProfile(req: AuthRequest, res: Response) {
       req.user!.id,
       req.body
     );
+    console.log('Updated vendor profile:', vendor);
     res.status(200).json({ success: true, data: vendor });
   } catch (err: any) {
     res.status(400).json({ success: false, message: err.message });

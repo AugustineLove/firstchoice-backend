@@ -149,7 +149,7 @@ const h =
   async (req: AuthRequest, res: Response) => {
     try {
       res.status(okStatus).json({ success: true, data: await fn(req) });
-    } catch (e: any) {
+    } catch (e: any) { 
       res.status(400).json({ success: false, message: e.message || 'Something went wrong' });
     }
   };

@@ -18,6 +18,7 @@ import { authenticate } from "../middleware/auth.middleware";
 import { requireTerms } from "../services/legal.service";
 import legalRouter from "./legal.routes";
 import notificationRouter from "./notification.routes";
+import { announcementRouter } from "./announcements.routes";
 
 const allRoutes = Router();
 
@@ -30,6 +31,7 @@ allRoutes.use('/api/riders', riderRouter);
 allRoutes.use('/api/deliveries', deliveryRouter);
 allRoutes.use('/api/errands', errandRouter);
 allRoutes.use('/api/transactions', transactionRouter);
+allRoutes.use('/api/announcements/', announcementRouter);
 allRoutes.use('/api/admin', adminRouter);
 allRoutes.use('/admin', adminRouter);
 allRoutes.use('/api/locations', locationRouter);

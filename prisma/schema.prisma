@@ -183,6 +183,8 @@ model Vendor {
   orders           Order[]
   longitude        String?
   latitude         String?
+
+  announcements Announcement[]
 }
 
 model Product {
@@ -222,6 +224,8 @@ model Product {
   addonGroups   ProductAddonGroup[]
   attributes    ProductAttribute[]
   reviews       ProductReview[]
+
+  announcements Announcement[]
 }
 
 model ProductVariantGroup {
@@ -895,4 +899,32 @@ model Notification {
 
   @@index([userId, createdAt])
   @@index([userId, readAt])
+}
+
+enum AnnouncementTarget {
+  VENDOR
+  PRODUCT
+  NONE
+}
+
+model Announcement {
+  id         String             @id @default(cuid())
+  title      String             // "New on FirstChoice 🎉"
+  subtitle   String?            // "Fresh jollof from Mama Put, order now"
+  imageUrl   String?
+  targetType AnnouncementTarget @default(VENDOR)
+  vendorId   String?
+  productId  String?
+  isActive   Boolean            @default(true)
+  startsAt   DateTime           @default(now())
+  endsAt     DateTime?          // null = runs until you switch it off
+  sortOrder  Int                @default(0)
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  vendor  Vendor?  @relation(fields: [vendorId],  references: [id], onDelete: SetNull)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+
+  @@index([isActive, startsAt, endsAt])
 }

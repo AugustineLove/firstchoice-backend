@@ -483,8 +483,8 @@ export async function assignRiderToOrder(orderId: string, riderId: string) {
 
   const rider = await prisma.rider.findUnique({ where: { id: riderId } });
   if (!rider) throw new Error('Rider not found');
-  if (rider.availability !== 'ONLINE')
-    throw new Error('Rider is not available');
+  // if (rider.availability !== 'ONLINE')
+  //   throw new Error('Rider is not available');
 
   const updated = await prisma.$transaction(async (tx) => {
     const result = await tx.order.update({
@@ -512,10 +512,10 @@ export async function assignRiderToOrder(orderId: string, riderId: string) {
     }
 
     // Lock in the new one
-    await tx.rider.update({
-      where: { id: riderId },
-      data: { availability: 'BUSY' },
-    });
+    // await tx.rider.update({
+    //   where: { id: riderId },
+    //   data: { availability: 'BUSY' },
+    // });
 
     return result;
   });
@@ -571,8 +571,8 @@ export async function assignRiderToDelivery(deliveryId: string, riderId: string)
     include: { user: { select: { name: true, phone: true } } },
   });
   if (!rider) throw new Error('Rider not found');
-  if (rider.availability !== 'ONLINE')
-    throw new Error('Rider is not available');
+  // if (rider.availability !== 'ONLINE')
+  //   throw new Error('Rider is not available');
 
   const updated = await prisma.$transaction(async (tx) => {
     const result = await tx.deliveryRequest.update({
@@ -600,10 +600,10 @@ export async function assignRiderToDelivery(deliveryId: string, riderId: string)
     }
 
     // Lock in the new one
-    await tx.rider.update({
-      where: { id: riderId },
-      data: { availability: 'BUSY' },
-    });
+    // await tx.rider.update({
+    //   where: { id: riderId },
+    //   data: { availability: 'BUSY' },
+    // });
 
     return result;
   });

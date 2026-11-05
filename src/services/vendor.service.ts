@@ -1,6 +1,7 @@
 import { prisma } from '../config/prisma';
 import * as NotificationService from './notification.service';
 import { isWithinHours } from '../utils/hours.util';
+import { console } from 'inspector/promises';
 
 export async function registerVendor(
   userId: string,
@@ -90,7 +91,7 @@ export async function updateVendorProfile(
 ) {
   const vendor = await prisma.vendor.findUnique({ where: { userId } });
   if (!vendor) throw new Error('Vendor profile not found');
-
+  console.log('Updating vendor profile for userId:', userId, 'with data:', data);
   // Basic sanity check: if provided, latitude/longitude must parse to real
   // numbers within valid GPS ranges before we persist them.
   if (data.latitude !== undefined) {
@@ -110,7 +111,7 @@ export async function updateVendorProfile(
   if (data.openingHours !== undefined) {
     payload.openingHours = validateOpeningHours(data.openingHours);
   }
-
+    console.log('Updating vendor profile with payload:', payload);
   return prisma.vendor.update({ where: { userId }, data: payload });
 }
 
