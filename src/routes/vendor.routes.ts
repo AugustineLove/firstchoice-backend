@@ -32,6 +32,6 @@ vendorRouter.get('/:id/rating/summary', authenticate, getRatingSummary);
 
 // Public paginated review list — no auth required.
 vendorRouter.get('/:id/ratings', getRatings);
-vendorRouter.get('/:id/:id/reviews', authenticate, h((req) => getVendorReviews(req.params.id as string, Number(req.query.limit) || 50))); // TODO: remove this duplicate route
+vendorRouter.get('/:id/reviews', authenticate, h((req) => getVendorReviews(req.params.id as string, Number(req.query.limit) || 50))); // TODO: remove this duplicate route
 
 export default vendorRouter;
