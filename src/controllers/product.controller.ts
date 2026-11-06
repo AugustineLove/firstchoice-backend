@@ -16,12 +16,33 @@ export async function createProduct(req: AuthRequest, res: Response) {
   }
 }
 
-export async function updateProduct(req: AuthRequest, res: Response) {
+export async function updateProductAdmin(req: AuthRequest, res: Response) {
   try {
     const userId = (req.query.userId as string) || req.user!.id;
     console.log("UPDATE PRODUCT REQUEST:", { userId, productId: req.params.id, body: req.body });
     const product = await ProductService.updateProduct(
       userId,
+      req.params.id as string,
+      req.body
+    );
+
+    res.status(200).json({ success: true, data: product });
+  } catch (err: any) {
+    console.error("UPDATE PRODUCT ERROR:", err);
+    console.error("MESSAGE:", err?.message);
+    console.error("STACK:", err?.stack);
+
+    res.status(500).json({
+      success: false,
+      message: err?.message || "Failed to update product",
+    });
+  }
+}
+
+export async function updateProduct(req: AuthRequest, res: Response) {
+  try {
+    const product = await ProductService.updateProduct(
+      req.user!.id,
       req.params.id as string,
       req.body
     );

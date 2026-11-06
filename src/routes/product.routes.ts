@@ -36,6 +36,12 @@ productRouter.patch(
   authorize('VENDOR', 'ADMIN'),
   ProductController.updateProduct
 );
+productRouter.patch(
+  '/a/:id',
+  authenticate,
+  authorize('VENDOR', 'ADMIN'),
+  ProductController.updateProductAdmin
+);
 
 productRouter.delete(
   '/:id',
