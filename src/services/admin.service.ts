@@ -768,11 +768,11 @@ export async function updateOrderStatusAdmin(
           where: { id: targetRiderId },
           data: { availability: 'ONLINE' },
         });
-      } else if (['RIDER_ASSIGNED', 'PICKED_UP', 'IN_TRANSIT', 'ARRIVED'].includes(newStatus)) {
-        await tx.rider.update({
-          where: { id: targetRiderId },
-          data: { availability: 'BUSY' },
-        });
+      // } else if (['RIDER_ASSIGNED', 'PICKED_UP', 'IN_TRANSIT', 'ARRIVED'].includes(newStatus)) {
+      //   await tx.rider.update({
+      //     where: { id: targetRiderId },
+      //     data: { availability: 'BUSY' },
+      //   });
       }
     }
 
