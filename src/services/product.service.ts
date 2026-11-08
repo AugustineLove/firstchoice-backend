@@ -183,7 +183,7 @@ export async function updateProduct(
   data: Partial<CreateProductInput>
 ) {
   console.log(`Updating product ${productId} for user ${userId} with data:`, data);
-  const vendor = await prisma.vendor.findUnique({ where: { id: userId } });
+  const vendor = await prisma.vendor.findUnique({ where: { userId: userId } });
   if (!vendor) throw new Error('Vendor profile not found');
 
   const product = await prisma.product.findUnique({ where: { id: productId } });
