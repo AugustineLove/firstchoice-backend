@@ -425,6 +425,14 @@ model Settings {
   privacyUrl   String?
   termsSummary String?   
 
+  androidLatestVersion String?   // e.g. "1.0.2"
+  androidMinVersion    String?   // below this = forced update
+  androidStoreUrl      String?
+  iosLatestVersion     String?
+  iosMinVersion        String?
+  iosStoreUrl          String?
+  updateMessage        String?
+
 }
 
 model Errand {

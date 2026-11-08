@@ -19,6 +19,7 @@ import { requireTerms } from "../services/legal.service";
 import legalRouter from "./legal.routes";
 import notificationRouter from "./notification.routes";
 import { announcementRouter } from "./announcements.routes";
+import appVersionRouter from "./appversion.routes";
 
 const allRoutes = Router();
 
@@ -41,5 +42,6 @@ allRoutes.use('/api/pros', prosRouter);
 allRoutes.use('/api/rides', authenticate, requireTerms, ridesRouter);
 allRoutes.use('/api/legal', legalRouter);
 allRoutes.use('/api/notifications', notificationRouter);
+allRoutes.use('/api/app', appVersionRouter);
 
 export default allRoutes;
