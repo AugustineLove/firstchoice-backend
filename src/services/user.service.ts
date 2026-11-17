@@ -139,7 +139,7 @@ export async function getUserOrders(id: string) {
     orderBy: { createdAt: 'desc' },
     include: {
       vendor: { select: { businessName: true, logo: true } },
-      items: { include: { product: { select: { name: true, images: true } } } },
+      items: { include: { product: { select: { name: true, images: true, price: true } } } },
       rider: { select: { user: { select: { name: true, phone: true } } } },
     },
   });

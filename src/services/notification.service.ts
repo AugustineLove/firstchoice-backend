@@ -38,7 +38,6 @@ function cleanString(str: any): string {
 }
 
 async function sendToUser(userId: string, payload: PushPayload) {
-
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { fcmToken: true, webFcmToken: true },
@@ -56,24 +55,35 @@ async function sendToUser(userId: string, payload: PushPayload) {
     }
   }
 
-
-  prisma.notification
-    .create({
+  // Save first so the push can carry the notification id.
+  // A failed save must never block the push itself.
+  let notificationId: string | undefined;
+  try {
+    const saved = await prisma.notification.create({
       data: {
         userId,
         type: safeData.type ?? null,
         title: safeTitle,
         body: safeBody,
-        data: safeData,
+        data: { ...safeData },
       },
-    })
-    .catch((e) => console.error('[notif] save failed', e));
+      select: { id: true },
+    });
+    notificationId = saved.id;
+  } catch (e) {
+    console.error('[notif] save failed', e);
+  }
+
+  // FCM data values must be strings; this goes only in the push, not the DB row
+  const pushData: Record<string, string> = notificationId
+    ? { ...safeData, notificationId }
+    : safeData;
 
   const results = await Promise.allSettled(tokens.map((token) =>
     app.messaging().send({
       token,
       notification: { title: safeTitle, body: safeBody },
-      data: safeData,
+      data: pushData,
       android: { priority: 'high', notification: { channelId: 'firstchoice_channel', priority: 'high' } },
       apns: { payload: { aps: { sound: 'default', badge: 1 } } },
       webpush: { fcmOptions: { link: safeData.screen ? `/${safeData.screen}` : '/' } },
@@ -81,16 +91,16 @@ async function sendToUser(userId: string, payload: PushPayload) {
   ));
 
   results.forEach((r, i) => {
-  if (r.status === 'rejected') {
-    console.error(`[push] send failed for user ${userId}, token ${tokens[i]?.slice(0, 12)}...:`, r.reason?.code, r.reason?.message);
-    if (r.reason?.code === 'messaging/registration-token-not-registered') {
-      const field = tokens[i] === user!.fcmToken ? 'fcmToken' : 'webFcmToken';
-      prisma.user.update({ where: { id: userId }, data: { [field]: null } }).catch(() => {});
+    if (r.status === 'rejected') {
+      console.error(`[push] send failed for user ${userId}, token ${tokens[i]?.slice(0, 12)}...:`, r.reason?.code, r.reason?.message);
+      if (r.reason?.code === 'messaging/registration-token-not-registered') {
+        const field = tokens[i] === user!.fcmToken ? 'fcmToken' : 'webFcmToken';
+        prisma.user.update({ where: { id: userId }, data: { [field]: null } }).catch(() => {});
+      }
+    } else {
+      console.log(`[push] sent OK to user ${userId}, token ${tokens[i]?.slice(0, 12)}...`);
     }
-  } else {
-    console.log(`[push] sent OK to user ${userId}, token ${tokens[i]?.slice(0, 12)}...`);
-  }
-});
+  });
 
   return results.some((r) => r.status === 'fulfilled');
 }

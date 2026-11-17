@@ -3,21 +3,42 @@ import { AnnouncementTarget } from '@prisma/client';
 import { AuthRequest } from '../interface/auth-request.interface.ts';
 import { Router, Response, NextFunction } from 'express';
 
-export async function createAnnouncement(adminId: string, data: {
-  title: string; subtitle?: string; imageUrl?: string;
-  targetType: AnnouncementTarget; vendorId?: string; productId?: string;
-  startsAt?: string; endsAt?: string; sortOrder?: number;
-}) {
-  if (!data.title?.trim()) throw new Error('Title is required');
 
-  if (data.targetType === 'VENDOR') {
-    if (!data.vendorId) throw new Error('vendorId is required');
-    const v = await prisma.vendor.findUnique({ where: { id: data.vendorId } });
+export async function createAnnouncement(adminId: string, data: {
+  title: string;
+  subtitle?: string;
+  imageUrl?: string;
+  targetType: AnnouncementTarget;
+  vendorId?: string | null;
+  productId?: string | null;
+  startsAt?: string;
+  endsAt?: string;
+  sortOrder?: number;
+}) {
+  if (!data.title?.trim()) {
+    throw new Error('Title is required');
+  }
+
+  const vendorId = data.vendorId?.trim() || null;
+  const productId = data.productId?.trim() || null;
+
+  // Validate vendor only when a vendor ID is supplied.
+  if (vendorId) {
+    const v = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+    });
+
     if (!v) throw new Error('Vendor not found');
   }
+
+  // Product announcements must have a valid product.
   if (data.targetType === 'PRODUCT') {
-    if (!data.productId) throw new Error('productId is required');
-    const p = await prisma.product.findUnique({ where: { id: data.productId } });
+    if (!productId) throw new Error('productId is required');
+
+    const p = await prisma.product.findUnique({
+      where: { id: productId },
+    });
+
     if (!p) throw new Error('Product not found');
   }
 
@@ -27,8 +48,8 @@ export async function createAnnouncement(adminId: string, data: {
       subtitle: data.subtitle?.trim() || null,
       imageUrl: data.imageUrl || null,
       targetType: data.targetType,
-      vendorId: data.vendorId,
-      productId: data.targetType === 'PRODUCT' ? data.productId : null,
+      vendorId,
+      productId: data.targetType === 'PRODUCT' ? productId : null,
       startsAt: data.startsAt ? new Date(data.startsAt) : new Date(),
       endsAt: data.endsAt ? new Date(data.endsAt) : null,
       sortOrder: data.sortOrder ?? 0,
@@ -38,7 +59,7 @@ export async function createAnnouncement(adminId: string, data: {
   await prisma.adminActionLog.create({
     data: {
       adminId,
-      action: 'BROADCAST_SENT', // reuse; add ANNOUNCEMENT_* enum values later if you want
+      action: 'BROADCAST_SENT',
       targetType: 'Announcement',
       targetId: created.id,
       summary: `Created home announcement "${created.title}"`,
@@ -47,6 +68,7 @@ export async function createAnnouncement(adminId: string, data: {
 
   return created;
 }
+
 
 export async function updateAnnouncement(id: string, data: Partial<{
   title: string; subtitle: string | null; imageUrl: string | null;
