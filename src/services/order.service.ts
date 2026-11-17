@@ -101,7 +101,7 @@ export async function placeOrder(
   if (vendor.status !== 'ACTIVE') throw new Error('This vendor is currently unavailable');
 
   const hasStructuredItems = Array.isArray(data.items) && data.items.length > 0;
-console.log(`Sub total: ${data.subtotal}`);
+  console.log(`Sub total: ${data.subtotal}`);
   // ═══════════════════════════════════════════════════════
   // LEGACY FLOW — untouched. Kicks in only when items[] is sent.
   // ═══════════════════════════════════════════════════════
@@ -137,16 +137,16 @@ console.log(`Sub total: ${data.subtotal}`);
     });
     const serverSubtotal = orderItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
 
-const quote = await quoteDelivery({
-  vendorId: data.vendorId,
-  pickupLat: toNum(vendor.latitude),
-  pickupLng: toNum(vendor.longitude),
-  destLat: data.deliveryLatitude,
-  destLng: data.deliveryLongitude,
-  subtotal: serverSubtotal,
-  customerId,
-  promoCode: data.promoCode,
-});
+  const quote = await quoteDelivery({
+      vendorId: data.vendorId,
+      pickupLat: toNum(vendor.latitude),
+      pickupLng: toNum(vendor.longitude),
+      destLat: data.deliveryLatitude,
+      destLng: data.deliveryLongitude,
+      subtotal: serverSubtotal,
+      customerId,
+      promoCode: data.promoCode,
+  });
 
 const order = await prisma.$transaction(async (tx) => {
   const newOrder = await tx.order.create({

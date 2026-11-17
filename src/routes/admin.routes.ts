@@ -9,6 +9,7 @@ import { updateServiceFlags } from '../services/service-flags.service';
 import { registerProsAdminRoutes } from '../services/pros.service';
 import { registerRidesAdminRoutes } from '../services/rides.service';
 import { registerLegalAdminRoutes } from '../services/legal.admin.service';
+import { registerDeliveryPricingAdminRoutes } from '../services/pricing.admin.service';
 
 const adminRouter = Router();
 
@@ -16,7 +17,8 @@ const adminRouter = Router();
 adminRouter.use(authenticate, authorize('ADMIN'));
 registerProsAdminRoutes(adminRouter);
 registerRidesAdminRoutes(adminRouter); 
-registerLegalAdminRoutes(adminRouter); // Register legal admin routes
+registerDeliveryPricingAdminRoutes(adminRouter);
+registerLegalAdminRoutes(adminRouter); 
 // Overview
 adminRouter.get('/stats', AdminController.getOverviewStats);
 adminRouter.get('/overview', AdminController.overview);

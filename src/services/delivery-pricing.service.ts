@@ -28,6 +28,7 @@ export async function quoteDelivery(input: {
   destLat?: number | null;
   destLng?: number | null;
   subtotal?: number;
+  distanceKm?: number | null; // admin simulator only
   customerId?: string;
   promoCode?: string;
 }): Promise<DeliveryQuote> {
@@ -38,12 +39,16 @@ export async function quoteDelivery(input: {
 
   // 1. base fee
   let distanceKm: number | null = null;
+  if (input.distanceKm != null) {
+    distanceKm = input.distanceKm;
+  } else if (input.pickupLat != null && input.pickupLng != null && input.destLat != null && input.destLng != null) {
+    distanceKm = haversineKm(input.pickupLat, input.pickupLng, input.destLat, input.destLng);
+  }
+
   let baseFee: number;
-  if (input.pickupLat == null || input.pickupLng == null ||
-      input.destLat == null || input.destLng == null) {
+  if (distanceKm == null) {
     baseFee = cfg.fallbackFee;
   } else {
-    distanceKm = haversineKm(input.pickupLat, input.pickupLng, input.destLat, input.destLng);
     baseFee = (cfg.baseFee + distanceKm * cfg.perKmRate) * cfg.surgeMultiplier;
     baseFee = Math.max(baseFee, cfg.minFee);
     if (cfg.maxFee != null) baseFee = Math.min(baseFee, cfg.maxFee);
@@ -59,7 +64,7 @@ export async function quoteDelivery(input: {
       endsAt: { gte: now },
       AND: [
         { OR: [{ vendorId: null }, { vendorId: input.vendorId }] },
-        { OR: [{ code: null }, ...(input.promoCode ? [{ code: input.promoCode }] : [])] },
+        { OR: [{ code: null }, ...(code ? [{ code }] : [])] },
       ],
     },
   });
