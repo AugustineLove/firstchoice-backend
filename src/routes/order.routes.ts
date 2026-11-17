@@ -4,11 +4,13 @@ import { authenticate, authorize } from '../middleware/auth.middleware';
 import { getOrdersReadyForPickup, riderAcceptOrder } from '../services/order.service';
 import multer from 'multer';
 import { requireOperatingHours } from '../middleware/operating.hours';
+import { registerDeliveryPricingRoutes } from '../services/delivery-pricing.service';
 
 const orderRouter = Router();
 
 // All order routes require authentication
 orderRouter.use(authenticate);
+registerDeliveryPricingRoutes(orderRouter, authenticate);
 
 // Customer
 orderRouter.post('/', authorize('CUSTOMER'), requireOperatingHours, OrderController.placeOrder);

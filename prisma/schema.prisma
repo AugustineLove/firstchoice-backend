@@ -339,6 +339,11 @@ model Order {
 
   pickupLatitude  Float?
   pickupLongitude Float?
+
+  originalDeliveryFee Float?
+  deliveryDiscount    Float  @default(0)
+  promotionId         String?
+
 }
 
 model OrderItem {
@@ -935,4 +940,39 @@ model Announcement {
 
 
   @@index([isActive, startsAt, endsAt])
+}
+
+model DeliveryPricingConfig {
+  id            String   @id @default(uuid())
+  baseFee       Float    @default(5)
+  perKmRate     Float    @default(2)
+  minFee        Float    @default(5)
+  maxFee        Float?
+  surgeMultiplier Float  @default(1)   // 1.0 = normal, 1.5 = rainy-day surge
+  fallbackFee   Float    @default(10)  // when coords are missing
+  active        Boolean  @default(true)
+  updatedAt     DateTime @updatedAt
+}
+
+enum PromoType { 
+  FREE_DELIVERY 
+  FIXED_OFF 
+  PERCENT_OFF
+}
+
+model DeliveryPromotion {
+  id            String    @id @default(uuid())
+  name          String
+  code          String?   @unique       // null = auto-applied
+  type          PromoType
+  value         Float     @default(0)   // GHS off, or percent
+  maxDiscount   Float?                  // cap for PERCENT_OFF
+  minSubtotal   Float?
+  vendorId      String?                 // null = all vendors
+  startsAt      DateTime
+  endsAt        DateTime
+  usageLimit    Int?
+  perUserLimit  Int?
+  usedCount     Int       @default(0)
+  active        Boolean   @default(true)
 }

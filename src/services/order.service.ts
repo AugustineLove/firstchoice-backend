@@ -11,93 +11,15 @@ import * as NotificationService from './notification.service';
 import cloudinary from '../config/cloudinary';
 import { sendCustomerMessage } from './message.service';
 import { LOGISTICS_MANAGER_NUMBERS } from '../utils/constants';
+import { quoteDelivery } from './delivery-pricing.service';
 
-interface feeData {
-  pickupLat?: number,
-  pickupLng?: number,
-  destLat?: number,
-  destLng?: number
-}
 
-// function calculateDeliveryFeeByDistance({
-//   pickupLat, pickupLng, destLat, destLng,
-// }: {
-//   pickupLat?: number | null;
-//   pickupLng?: number | null;
-//   destLat?: number | null;
-//   destLng?: number | null;
-// }) {
-//   if (
-//     pickupLat == null ||
-//     pickupLng == null ||
-//     destLat == null ||
-//     destLng == null
-//   ) {
-//     return 10; // fallback flat fee if coords missing
-//   }
 
-//   const r = 6371;
-//   const toRad = (d: number) => (d * Math.PI) / 180;
-
-//   const dLat = toRad(destLat - pickupLat);
-//   const dLng = toRad(destLng - pickupLng);
-
-//   const a =
-//     Math.sin(dLat / 2) ** 2 +
-//     Math.cos(toRad(pickupLat)) *
-//       Math.cos(toRad(destLat)) *
-//       Math.sin(dLng / 2) ** 2;
-
-//   const km =
-//     r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-//   if (km <= 1) return 5;
-//   if (km <= 1.5) return 6;
-//   if (km <= 2) return 7;
-//   if (km <= 2.5) return 8;
-//   if (km <= 3) return 9;
-//   if (km <= 3.5) return 10;
-//   if (km <= 4) return 11;
-//   if (km <= 4.5) return 12;
-//   if (km <= 5) return 13;
-//   if (km <= 5.5) return 14;
-//   if (km <= 6) return 15;
-//   if (km <= 6.5) return 16;
-//   if (km <= 7) return 17;
-//   if (km <= 7.5) return 18;
-//   if (km <= 8) return 19;
-//   if (km <= 8.5) return 20;
-//   if (km <= 9) return 21;
-//   if (km <= 9.5) return 22;
-//   if (km <= 10) return 23;
-//   if (km <= 10.5) return 24;
-//   if (km <= 11) return 25;
-//   if (km <= 11.5) return 26;
-//   if (km <= 12) return 27;
-//   if (km <= 12.5) return 28;
-//   if (km <= 13) return 29;
-//   if (km <= 13.5) return 30;
-//   if (km <= 14) return 31;
-//   if (km <= 14.5) return 32;
-//   if (km <= 15) return 33;
-//   if (km <= 15.5) return 34;
-//   if (km <= 16) return 35;
-//   if (km <= 16.5) return 36;
-//   if (km <= 17) return 37;
-//   if (km <= 17.5) return 38;
-//   if (km <= 18) return 39;
-//   if (km <= 18.5) return 40;
-//   if (km <= 19) return 41;
-//   if (km <= 19.5) return 42;
-//   if (km <= 20) return 43;
-//   if (km <= 20.5) return 44;
-//   if (km <= 21) return 45;
-//   if (km <= 21.5) return 46;
-//   if (km <= 22) return 47;
-//   if (km <= 22.5) return 48;
-//   if (km <= 23) return 49;
-//   return 50;
-// }
+const toNum = (v: unknown): number | null => {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
 
 const _kBaseFeeGhs = 5;
 const _kPerKmGhs = 2;
@@ -160,7 +82,7 @@ export async function placeOrder(
       itemNotes?: string;
     }[];
     subtotal?: any;
-
+    promoCode?: string;
     // ── new simple flow ──
     note?: string;
 
@@ -213,54 +135,67 @@ console.log(`Sub total: ${data.subtotal}`);
         itemNotes: item.itemNotes,
       };
     });
-    const calculationData = {
-      pickupLat: Number(vendor.latitude),
-      pickupLng: Number(vendor.longitude),
-      destLat: data.deliveryLatitude,
-      destLng: data.deliveryLongitude
-    } as feeData;
+    const serverSubtotal = orderItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
 
-    const deliveryFee = calculateDeliveryFeeByDistance(calculationData);
-    const totalAmount = data.subtotal + deliveryFee;
+const quote = await quoteDelivery({
+  vendorId: data.vendorId,
+  pickupLat: toNum(vendor.latitude),
+  pickupLng: toNum(vendor.longitude),
+  destLat: data.deliveryLatitude,
+  destLng: data.deliveryLongitude,
+  subtotal: serverSubtotal,
+  customerId,
+  promoCode: data.promoCode,
+});
 
-    const order = await prisma.$transaction(async (tx) => {
-      const newOrder = await tx.order.create({
-        data: {
-          customerId,
-          vendorId: data.vendorId,
-          deliveryAddress: data.deliveryAddress,
-          deliveryLatitude: data.deliveryLatitude ?? null,
-          deliveryLongitude: data.deliveryLongitude ?? null,
-          paymentMethod: data.paymentMethod,
-          recipientName: data.recipientName || null,
-          recipientPhone: data.recipientPhone || null,
-          notes: data.notes || null,
-          subtotal: data.subtotal,
-          pickupLatitude: Number(vendor.latitude) || null,
-          pickupLongitude: Number(vendor.longitude) || null,
-          vendorAddress: vendor.businessName,
-          deliveryFee,
-          totalAmount,
-          orderType: 'MARKETPLACE',
-           orderStatus: 'PENDING',
-          items: { create: orderItems },
-        },
-        include: {
-          customer: { select: { id: true, name: true, phone: true } },
-          items: { include: { product: { select: { name: true, images: true } } } },
-          vendor: { select: { businessName: true, logo: true, phone: true } },
-        },
-      });
+const order = await prisma.$transaction(async (tx) => {
+  const newOrder = await tx.order.create({
+    data: {
+      customerId,
+      vendorId: data.vendorId,
+      deliveryAddress: data.deliveryAddress,
+      deliveryLatitude: data.deliveryLatitude ?? null,
+      deliveryLongitude: data.deliveryLongitude ?? null,
+      paymentMethod: data.paymentMethod,
+      recipientName: data.recipientName || null,
+      recipientPhone: data.recipientPhone || null,
+      notes: data.notes || null,
+      subtotal: serverSubtotal,
+      pickupLatitude: toNum(vendor.latitude),
+      pickupLongitude: toNum(vendor.longitude),
+      vendorAddress: vendor.businessName,
+      deliveryFee: quote.finalFee,
+      originalDeliveryFee: quote.baseFee,
+      deliveryDiscount: quote.discount,
+      promotionId: quote.promotionId,
+      totalAmount: serverSubtotal + quote.finalFee,
+      orderType: 'MARKETPLACE',
+      orderStatus: 'PENDING',
+      items: { create: orderItems },
+    },
+    include: {
+      customer: { select: { id: true, name: true, phone: true } },
+      items: { include: { product: { select: { name: true, images: true } } } },
+      vendor: { select: { businessName: true, logo: true, phone: true } },
+    },
+  });
 
-      for (const item of data.items!) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { decrement: item.quantity } },
-        });
-      }
+  for (const item of data.items!) {
+    await tx.product.update({
+      where: { id: item.productId },
+      data: { stock: { decrement: item.quantity } },
+    });
+  }
 
-      return newOrder;
-    }, { timeout: 15000, maxWait: 30000 });
+  if (quote.promotionId) {
+    await tx.deliveryPromotion.update({
+      where: { id: quote.promotionId },
+      data: { usedCount: { increment: 1 } },
+    });
+  }
+
+  return newOrder;
+}, { timeout: 15000, maxWait: 30000 });
     
     sendCustomerMessage({
       messageTo: LOGISTICS_MANAGER_NUMBERS,
@@ -284,43 +219,59 @@ console.log(`Sub total: ${data.subtotal}`);
     throw new Error('Either items[] or a note is required to place an order');
   }
 
-  const deliveryFee = calculateDeliveryFeeByDistance({
-    pickupLat: Number(vendor.latitude),
-    pickupLng: Number(vendor.longitude),
+  // No verifiable items in this flow, so the client's estimate is all we have.
+  const clientSubtotal = Math.max(0, Number(data.subtotal) || 0);
+
+  const quote = await quoteDelivery({
+    vendorId: data.vendorId,
+    pickupLat: toNum(vendor.latitude),
+    pickupLng: toNum(vendor.longitude),
     destLat: data.deliveryLatitude,
     destLng: data.deliveryLongitude,
+    subtotal: clientSubtotal,
+    customerId,
+    promoCode: data.promoCode,
   });
 
-  const order = await prisma.order.create({
-    data: {
-      customerId,
-      vendorId: data.vendorId,
-      deliveryAddress: data.deliveryAddress,
-      deliveryLatitude: data.deliveryLatitude ?? null,
-      deliveryLongitude: data.deliveryLongitude ?? null,
-      paymentMethod: data.paymentMethod,
-      recipientName: data.recipientName || null,
-      recipientPhone: data.recipientPhone || null,
-      notes: data.note.trim(),
-      pickupLatitude: Number(vendor.latitude) || null,
-      pickupLongitude: Number(vendor.longitude) || null,
-      vendorAddress: vendor.businessName,
-      subtotal: data.subtotal,          // unknown until vendor confirms
-      deliveryFee,
-      totalAmount: deliveryFee, // updated once vendor sets item pricing
-      orderType: 'MARKETPLACE',
-       orderStatus: 'PENDING',
-    },
-    include: {
-      customer: { select: { id: true, name: true, phone: true } },
-      vendor: { select: { businessName: true, logo: true, phone: true } },
-    },
-  });
-    sendCustomerMessage({
-      messageTo: LOGISTICS_MANAGER_NUMBERS,
-      messageFrom: 'FirstChoice',
-      message: `New order placed: ${order.vendor.businessName} → ${order.deliveryAddress}.\nDelivery Fee: GHS ${order.deliveryFee?.toFixed(2)}\nTotal: GHS ${order.totalAmount?.toFixed(2)}.`,
+  const order = await prisma.$transaction(async (tx) => {
+    const created = await tx.order.create({
+      data: {
+        customerId,
+        vendorId: data.vendorId,
+        deliveryAddress: data.deliveryAddress,
+        deliveryLatitude: data.deliveryLatitude ?? null,
+        deliveryLongitude: data.deliveryLongitude ?? null,
+        paymentMethod: data.paymentMethod,
+        recipientName: data.recipientName || null,
+        recipientPhone: data.recipientPhone || null,
+        notes: data.note?.trim(),
+        pickupLatitude: toNum(vendor.latitude),
+        pickupLongitude: toNum(vendor.longitude),
+        vendorAddress: vendor.businessName,
+        subtotal: clientSubtotal,
+        deliveryFee: quote.finalFee,
+        originalDeliveryFee: quote.baseFee,
+        deliveryDiscount: quote.discount,
+        promotionId: quote.promotionId,
+        totalAmount: quote.finalFee, // vendor confirms item pricing later
+        orderType: 'MARKETPLACE',
+        orderStatus: 'PENDING',
+      },
+      include: {
+        customer: { select: { id: true, name: true, phone: true } },
+        vendor: { select: { businessName: true, logo: true, phone: true } },
+      },
     });
+
+    if (quote.promotionId) {
+      await tx.deliveryPromotion.update({
+        where: { id: quote.promotionId },
+        data: { usedCount: { increment: 1 } },
+      });
+    }
+    return created;
+  });
+    
   notifyRiders('delivery:new_request', order);
   notifyAdmins('admin:order_ready_for_dispatch', {
     orderId: order.id,
