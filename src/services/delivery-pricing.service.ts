@@ -1,5 +1,8 @@
 import { Router } from "express";
 import { prisma } from "../config/prisma";
+import { Prisma } from '@prisma/client';
+export type PromoScope = 'MARKETPLACE' | 'PICKUP' | 'ERRAND';
+
 
 export type DeliveryQuote = {
   distanceKm: number | null;
@@ -22,7 +25,8 @@ function haversineKm(aLat: number, aLng: number, bLat: number, bLng: number) {
 }
 
 export async function quoteDelivery(input: {
-  vendorId: string;
+  vendorId?: string;       // was required
+  scope?: PromoScope;      // default MARKETPLACE
   pickupLat?: number | null;
   pickupLng?: number | null;
   destLat?: number | null;
@@ -32,7 +36,8 @@ export async function quoteDelivery(input: {
   customerId?: string;
   promoCode?: string;
 }): Promise<DeliveryQuote> {
-    const code = input.promoCode?.trim().toUpperCase();
+  const scope = input.scope ?? 'MARKETPLACE';
+  const code = input.promoCode?.trim().toUpperCase();
   const cfg =
   (await prisma.deliveryPricingConfig.findFirst({ where: { active: true } })) ??
   { baseFee: 5, perKmRate: 2, minFee: 5, maxFee: null as number | null, surgeMultiplier: 1, fallbackFee: 10 };
@@ -59,14 +64,16 @@ export async function quoteDelivery(input: {
   const now = new Date();
   const promos = await prisma.deliveryPromotion.findMany({
     where: {
-      active: true,
-      startsAt: { lte: now },
-      endsAt: { gte: now },
-      AND: [
-        { OR: [{ vendorId: null }, { vendorId: input.vendorId }] },
-        { OR: [{ code: null }, ...(code ? [{ code }] : [])] },
-      ],
-    },
+    active: true,
+    startsAt: { lte: now },
+    endsAt: { gte: now },
+    appliesTo: { has: scope },
+    AND: [
+      // vendor-specific promos must never leak onto requests with no vendor
+      input.vendorId ? { OR: [{ vendorId: null }, { vendorId: input.vendorId }] } : { vendorId: null },
+      { OR: [{ code: null }, ...(code ? [{ code }] : [])] },
+    ],
+  },
   });
 
   let best: { discount: number; promo: (typeof promos)[number] } | null = null;
@@ -75,10 +82,11 @@ export async function quoteDelivery(input: {
     if (p.minSubtotal != null && (input.subtotal ?? 0) < p.minSubtotal) continue;
     // (perUserLimit check: count this customer's past orders with promotionId = p.id)
     if (p.perUserLimit != null && input.customerId) {
-    const used = await prisma.order.count({
-        where: { customerId: input.customerId, promotionId: p.id, orderStatus: { not: 'CANCELLED' } },
-    });
-    if (used >= p.perUserLimit) continue;
+      const [o, d] = await Promise.all([
+        prisma.order.count({ where: { customerId: input.customerId, promotionId: p.id, orderStatus: { not: 'CANCELLED' } } }),
+        prisma.deliveryRequest.count({ where: { customerId: input.customerId, promotionId: p.id, status: { not: 'CANCELLED' } } }),
+      ]);
+      if (o + d >= p.perUserLimit) continue;
     }
 
     let discount = 0;
@@ -133,4 +141,15 @@ export function registerDeliveryPricingRoutes(router: Router, auth: any) {
       res.status(500).json({ error: e.message ?? 'Could not calculate delivery fee' });
     }
   });
+}
+
+export async function redeemPromotion(tx: Prisma.TransactionClient, promotionId: string | null) {
+  if (!promotionId) return;
+  const p = await tx.deliveryPromotion.update({
+    where: { id: promotionId },
+    data: { usedCount: { increment: 1 } },
+  });
+  if (p.usageLimit != null && p.usedCount > p.usageLimit) {
+    throw new Error('That promotion has just ended. Please try again.');
+  }
 }

@@ -12,51 +12,43 @@ import { sendCustomerMessage } from './message.service';
 import { getSettings } from './setting.service';
 import { assignRiderToDelivery as adminAssignRiderToDelivery } from './admin.service';
 
-const _kBaseFeeGhs = 5;
-const _kPerKmGhs = 2;
+import { quoteDelivery, redeemPromotion } from './delivery-pricing.service';
+// import { deliveryRiderPay } from '../utils/rider-pay';
 
-function calculateDeliveryEstimate({
-  pickupLat,
-  pickupLng,
-  destLat,
-  destLng,
-}: {   
-  pickupLat?: number | null;
-  pickupLng?: number | null;
-  destLat?: number | null;
-  destLng?: number | null;
-}): number {
-  if (
-    pickupLat == null ||
-    pickupLng == null ||
-    destLat == null ||
-    destLng == null
-  ) {
-    return 10; // fallback flat fee if coords missing
+
+export async function quoteDeliveryRequest(customerId: string, data: {
+  type?: 'PICKUP' | 'ERRAND';
+  pickupLatitude?: number | null; pickupLongitude?: number | null;
+  destinationLatitude?: number | null; destinationLongitude?: number | null;
+  itemCount?: number; itemsEstimatedTotal?: number; promoCode?: string;
+}) {
+  const type = data.type === 'ERRAND' ? 'ERRAND' : 'PICKUP';
+  let pLat = data.pickupLatitude ?? null;
+  let pLng = data.pickupLongitude ?? null;
+  let errandFee = 0;
+
+  if (type === 'ERRAND') {
+    const settings = await getSettings();
+    if (!settings.errandPickupLocation) {
+      throw new Error('Errand pickup location has not been configured yet. Please contact support.');
+    }
+    pLat = settings.errandPickupLocation.latitude;
+    pLng = settings.errandPickupLocation.longitude;
+    errandFee = calculateErrandFee(
+      settings.errandPricingMode, settings.errandFixedPrice, settings.errandPerItemPrice, data.itemCount ?? 0,
+    );
   }
 
-  const earthRadiusKm = 6371.0;
+  const quote = await quoteDelivery({
+    scope: type,
+    pickupLat: pLat, pickupLng: pLng,
+    destLat: data.destinationLatitude ?? null, destLng: data.destinationLongitude ?? null,
+    subtotal: type === 'ERRAND' ? (data.itemsEstimatedTotal ?? 0) : 0,
+    customerId,
+    promoCode: data.promoCode,
+  });
 
-  const toRad = (degrees: number) => (degrees * Math.PI) / 180;
-
-  const dLat = toRad(destLat - pickupLat);
-  const dLng = toRad(destLng - pickupLng);
-
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(pickupLat)) *
-      Math.cos(toRad(destLat)) *
-      Math.sin(dLng / 2) ** 2;
-
-  const c =
-    2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-  const distanceKm = earthRadiusKm * c;
-
-  const fee =
-    _kBaseFeeGhs + distanceKm * _kPerKmGhs;
-
-  return Math.round(fee);
+  return { ...quote, errandFee, total: quote.finalFee + errandFee };
 }
 
 function calculateErrandFee(
@@ -218,6 +210,7 @@ export async function createDeliveryRequest(
     pickupAddress?: string;
     pickupLatitude?: number;
     pickupLongitude?: number;
+    promoCode?: string;
     destinationAddress: string;
     destinationLatitude?: number;
     destinationLongitude?: number;
@@ -263,48 +256,57 @@ export async function createDeliveryRequest(
 
     itemsEstimatedTotal = errandItemsClean.reduce((sum, it) => sum + it.estimatedPrice, 0);
 
-    errandFee = calculateErrandFee(
-      settings.errandPricingMode,
-      settings.errandFixedPrice,
-      settings.errandPerItemPrice,
-      errandItemsClean.length,
-    );
-  } else {
-    if (!pickupAddress) throw new Error('Pickup address is required.');
-    if (!itemDescription) throw new Error('Item description is required.');
-  }
+        errandFee = calculateErrandFee(
+          settings.errandPricingMode,
+          settings.errandFixedPrice,
+          settings.errandPerItemPrice,
+          errandItemsClean.length,
+        );
+      } else {
+        if (!pickupAddress) throw new Error('Pickup address is required.');
+        if (!itemDescription) throw new Error('Item description is required.');
+      }
 
-  const deliveryFee = calculateDeliveryEstimate({
-  pickupLat: pickupLatitude,
-  pickupLng: pickupLongitude,
-  destLat: data.destinationLatitude,
-  destLng: data.destinationLongitude,
-  });
-  const estimatedFee = deliveryFee + errandFee; // service fee only — items cost tracked separately
-
-  const delivery = await prisma.deliveryRequest.create({
-    data: {
+      const quote = await quoteDelivery({
+      scope: type,
+      pickupLat: pickupLatitude ?? null,
+      pickupLng: pickupLongitude ?? null,
+      destLat: data.destinationLatitude ?? null,
+      destLng: data.destinationLongitude ?? null,
+      subtotal: type === 'ERRAND' ? itemsEstimatedTotal : 0,
       customerId,
-      type,
-      pickupAddress,
-      pickupLatitude,
-      pickupLongitude,
-      destinationAddress:   data.destinationAddress.trim(),
-      destinationLatitude:  data.destinationLatitude,
-      destinationLongitude: data.destinationLongitude,
-      itemDescription,
-      errandItems:          type === 'ERRAND' ? errandItemsClean : undefined,
-      itemsEstimatedTotal,
-      deliveryFee,
-      errandFee,
-      estimatedFee,
-      paymentMethod:  data.paymentMethod,
-      recipientName:  data.recipientName?.trim() || null,
-      recipientPhone: data.recipientPhone?.trim() || null,
-      imageUrl:       data.imageUrl || null,
-    },
-    include: { customer: { select: { name: true, phone: true } } },
-  });
+      promoCode: data.promoCode,
+    });
+
+    const deliveryFee = quote.finalFee;            // what the customer pays
+    const estimatedFee = deliveryFee + errandFee;  // customer's service fee
+
+    const delivery = await prisma.$transaction(async (tx) => {
+      const created = await tx.deliveryRequest.create({
+        data: {
+          customerId, type, pickupAddress, pickupLatitude, pickupLongitude,
+          destinationAddress: data.destinationAddress.trim(),
+          destinationLatitude: data.destinationLatitude,
+          destinationLongitude: data.destinationLongitude,
+          itemDescription,
+          errandItems: type === 'ERRAND' ? errandItemsClean : undefined,
+          itemsEstimatedTotal,
+          deliveryFee,
+          originalDeliveryFee: quote.baseFee,
+          deliveryDiscount: quote.discount,
+          promotionId: quote.promotionId,
+          errandFee,
+          estimatedFee,
+          paymentMethod: data.paymentMethod,
+          recipientName: data.recipientName?.trim() || null,
+          recipientPhone: data.recipientPhone?.trim() || null,
+          imageUrl: data.imageUrl || null,
+        },
+        include: { customer: { select: { name: true, phone: true } } },
+      });
+      await redeemPromotion(tx, quote.promotionId);
+      return created;
+    });
 
   const itemsLine = type === 'ERRAND'
     ? `\nErrand list:\n${errandItemsClean.map((it) => `- ${it.text} (~GHS ${it.estimatedPrice.toFixed(2)})`).join('\n')}\nEstimated items cost: GHS ${itemsEstimatedTotal.toFixed(2)}`

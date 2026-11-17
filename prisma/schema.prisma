@@ -392,6 +392,10 @@ model DeliveryRequest {
   recipientName  String?
   recipientPhone String?
   imageUrl       String?
+
+  originalDeliveryFee Float?
+  deliveryDiscount    Float   @default(0)
+  promotionId         String?
 }
 
 model Location {
@@ -975,4 +979,6 @@ model DeliveryPromotion {
   perUserLimit  Int?
   usedCount     Int       @default(0)
   active        Boolean   @default(true)
+
+  appliesTo String[] @default(["MARKETPLACE", "PICKUP", "ERRAND"])
 }
